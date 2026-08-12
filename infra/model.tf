@@ -8,7 +8,7 @@ resource "google_service_account" "vllm" {
 resource "google_compute_instance_template" "vllm" {
   name_prefix  = "vllm-"
   machine_type = var.model_machine_type
-  region       = var.region
+  region       = var.model_region
   tags         = ["vllm"]
 
   disk {
@@ -29,7 +29,7 @@ resource "google_compute_instance_template" "vllm" {
   }
 
   network_interface {
-    subnetwork = google_compute_subnetwork.main.id
+    subnetwork = google_compute_subnetwork.model.id
     # no access_config: private IP only, egress via Cloud NAT
   }
 
@@ -67,7 +67,7 @@ resource "google_compute_health_check" "vllm" {
 
 resource "google_compute_region_instance_group_manager" "vllm" {
   name               = "vllm-mig"
-  region             = var.region
+  region             = var.model_region
   base_instance_name = "vllm"
   target_size        = var.model_replicas
 
@@ -99,7 +99,7 @@ resource "google_compute_region_instance_group_manager" "vllm" {
 # Internal L7 LB in front of the MIG.
 resource "google_compute_region_backend_service" "vllm" {
   name                  = "vllm-backend"
-  region                = var.region
+  region                = var.model_region
   protocol              = "HTTP"
   load_balancing_scheme = "INTERNAL_MANAGED"
   timeout_sec           = 300
@@ -115,32 +115,33 @@ resource "google_compute_region_backend_service" "vllm" {
 
 resource "google_compute_region_url_map" "vllm" {
   name            = "vllm-urlmap"
-  region          = var.region
+  region          = var.model_region
   default_service = google_compute_region_backend_service.vllm.id
 }
 
 resource "google_compute_region_target_http_proxy" "vllm" {
   name    = "vllm-proxy"
-  region  = var.region
+  region  = var.model_region
   url_map = google_compute_region_url_map.vllm.id
 }
 
 resource "google_compute_address" "vllm_ilb" {
   name         = "vllm-ilb-ip"
-  region       = var.region
-  subnetwork   = google_compute_subnetwork.main.id
+  region       = var.model_region
+  subnetwork   = google_compute_subnetwork.model.id
   address_type = "INTERNAL"
-  address      = "10.10.0.100"
+  address      = "10.10.2.100"
 }
 
 resource "google_compute_forwarding_rule" "vllm" {
   name                  = "vllm-ilb"
-  region                = var.region
+  region                = var.model_region
   load_balancing_scheme = "INTERNAL_MANAGED"
   network               = google_compute_network.vpc.id
-  subnetwork            = google_compute_subnetwork.main.id
+  subnetwork            = google_compute_subnetwork.model.id
   ip_address            = google_compute_address.vllm_ilb.id
   port_range            = "80"
   target                = google_compute_region_target_http_proxy.vllm.id
-  depends_on            = [google_compute_subnetwork.proxy_only]
+  allow_global_access   = true # gateway runs in a different region
+  depends_on            = [google_compute_subnetwork.model_proxy_only]
 }
