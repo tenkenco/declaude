@@ -102,7 +102,10 @@ def create_app(*, model: ModelClient, auth: Authenticator, usage: UsageStore, se
 
     @app.post("/mcp")
     async def mcp(request: Request, user_id: UserId, response: Response):
-        msg = await request.json()
+        try:
+            msg = await request.json()
+        except ValueError:  # malformed body -> JSON-RPC parse error
+            return JSONResponse(rpc_error(None, -32700, "parse error"), status_code=400)
         method, params, msg_id = msg.get("method"), msg.get("params") or {}, msg.get("id")
 
         if method == "initialize":
