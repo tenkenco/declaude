@@ -48,7 +48,7 @@ def default_webhook_verifier(payload: bytes, sig_header: str) -> dict:
 
     event = stripe.Webhook.construct_event(payload, sig_header, os.environ["STRIPE_WEBHOOK_SECRET"])
     # StripeObject attribute access is unreliable across versions; normalize to plain JSON types.
-    return json.loads(json.dumps(event, default=lambda o: dict(o)))
+    return json.loads(str(event))  # StripeObject.__str__ is canonical JSON
 
 
 def create_app(

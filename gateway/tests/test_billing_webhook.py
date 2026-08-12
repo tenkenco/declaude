@@ -113,6 +113,7 @@ def test_default_verifier_returns_plain_dict(monkeypatch):
     import time
 
     import stripe
+
     from declaude.app import default_webhook_verifier
 
     secret = "whsec_testsecret"
