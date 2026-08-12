@@ -87,17 +87,20 @@ def create_app(
         }
         return HTTPException(402, body, headers={"X-Payment-Required": "stripe-payment-link"})
 
-    async def meter(user_id: str, response: Response) -> None:
-        """Enforce the free tier, then record usage. Paid users bypass the gate."""
-        period = current_period()
-        if not await usage.is_paid(user_id):
-            if await usage.get(user_id, period) >= settings.free_tier_monthly_limit:
-                raise payment_challenge()
-            count = await usage.increment(user_id, period)
+    async def check_quota(user_id: str) -> bool:
+        """Gate BEFORE the model call. Returns whether the user is on the free tier."""
+        if await usage.is_paid(user_id):
+            return False
+        if await usage.get(user_id, current_period()) >= settings.free_tier_monthly_limit:
+            raise payment_challenge()
+        return True
+
+    async def record_usage(user_id: str, free_tier: bool, response: Response) -> None:
+        """Record AFTER a successful translation so failures never burn quota."""
+        count = await usage.increment(user_id, current_period())
+        if free_tier:
             response.headers["X-RateLimit-Limit"] = str(settings.free_tier_monthly_limit)
-            response.headers["X-RateLimit-Remaining"] = str(settings.free_tier_monthly_limit - count)
-        else:
-            await usage.increment(user_id, period)
+            response.headers["X-RateLimit-Remaining"] = str(max(0, settings.free_tier_monthly_limit - count))
 
     async def run_translation(text: str) -> str:
         if len(text) > settings.max_input_chars:
@@ -122,8 +125,9 @@ def create_app(
     async def translate(body: TranslateRequest, user_id: UserId, response: Response):
         if len(body.text) > settings.max_input_chars:
             raise HTTPException(422, f"text exceeds {settings.max_input_chars} characters")
-        await meter(user_id, response)
+        free_tier = await check_quota(user_id)
         translation = await run_translation(body.text)
+        await record_usage(user_id, free_tier, response)
         return {"translation": translation, "model": settings.model_name}
 
     # ---- Stripe billing webhook (public: Stripe signature is the auth) ----
@@ -182,8 +186,9 @@ def create_app(
             text = (params.get("arguments") or {}).get("text", "")
             if not text.strip():
                 return JSONResponse(rpc_error(msg_id, -32602, "text must not be empty"))
-            await meter(user_id, response)  # raises 402 when free tier exhausted
+            free_tier = await check_quota(user_id)  # raises 402 when free tier exhausted
             translation = await run_translation(text)
+            await record_usage(user_id, free_tier, response)
             return rpc_result(msg_id, {"content": [{"type": "text", "text": translation}], "isError": False})
         return JSONResponse(rpc_error(msg_id, -32601, f"method not found: {method}"))
 

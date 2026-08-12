@@ -36,3 +36,13 @@ def test_paid_user_bypasses_free_tier(client, usage, settings):
     for _ in range(settings.free_tier_monthly_limit + 2):
         r = client.post("/v1/translate", json={"text": "hi"}, headers=AUTH)
         assert r.status_code == 200
+
+
+def test_failed_translation_does_not_burn_quota(client, model, usage, monkeypatch):
+    """Prod finding: a 503 (model warming) must not consume free-tier quota."""
+    async def boom(system, prompt):
+        raise RuntimeError("backend down")
+    monkeypatch.setattr(model, "complete", boom)
+    r = client.post("/v1/translate", json={"text": "hi"}, headers=AUTH)
+    assert r.status_code == 503
+    assert usage.get_sync("user_123") == 0
