@@ -11,6 +11,8 @@ class Settings(BaseModel):
     max_input_chars: int = 50_000
     stripe_payment_link: str = ""
     clerk_publishable_key: str = ""
+    public_base_url: str = "https://speak-english.tenken.co"
+    ga_measurement_id: str = ""
     price_usd_per_month: str = "5.00"
 
     @classmethod
