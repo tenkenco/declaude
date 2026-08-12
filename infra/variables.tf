@@ -26,7 +26,7 @@ variable "model_machine_type" {
 }
 
 variable "model_accelerator" {
-  type = object({ type = string, count = number })
+  type    = object({ type = string, count = number })
   default = { type = "nvidia-l4", count = 1 }
 }
 
