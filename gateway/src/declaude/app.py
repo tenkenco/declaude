@@ -3,11 +3,12 @@ from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, field_validator
 
 from .auth import Authenticator
 from .config import Settings
+from .landing import LANDING_HTML
 from .model import ModelClient
 from .prompts import SYSTEM_PROMPT
 from .usage import UsageStore, current_period
@@ -115,6 +116,10 @@ def create_app(
                 {"error": "model_unavailable", "message": "model backend is unavailable or warming up; retry shortly"},
                 headers={"Retry-After": "30"},
             ) from exc
+
+    @app.get("/", include_in_schema=False)
+    async def landing() -> HTMLResponse:
+        return HTMLResponse(LANDING_HTML)
 
     @app.get("/healthz")
     @app.get("/health")  # /healthz is intercepted by the Google Frontend on run.app URLs
