@@ -28,6 +28,7 @@ resource "google_compute_instance_template" "vllm" {
     # auto-healing + the gateway's 503/Retry-After degradation (~15 min re-warm).
     preemptible                 = true
     provisioning_model          = "SPOT"
+    instance_termination_action = "STOP" # API default; explicit to avoid perma-diff (DELETE is rejected by MIGs)
     on_host_maintenance         = "TERMINATE"
     automatic_restart           = false # required for spot
   }

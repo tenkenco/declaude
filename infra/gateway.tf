@@ -25,7 +25,7 @@ resource "google_firestore_database" "main" {
 
 # Secrets (values are set out-of-band, never in Terraform state)
 resource "google_secret_manager_secret" "secrets" {
-  for_each  = toset(["clerk-secret-key", "stripe-secret-key", "stripe-webhook-secret", "stripe-payment-link"])
+  for_each  = toset(["clerk-secret-key", "stripe-secret-key", "stripe-webhook-secret", "stripe-payment-link", "owner-api-key"])
   secret_id = each.key
   replication {
     auto {}
