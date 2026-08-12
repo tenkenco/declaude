@@ -20,6 +20,8 @@ class UsageStore(ABC):
     async def set_paid(self, user_id: str, paid: bool) -> None: ...
     @abstractmethod
     async def get_user_for_key(self, key_hash: str) -> str | None: ...
+    @abstractmethod
+    async def add_api_key(self, key_hash: str, user_id: str) -> None: ...
 
 
 class InMemoryUsageStore(UsageStore):
@@ -53,6 +55,9 @@ class InMemoryUsageStore(UsageStore):
         return self._keys.get(key_hash)
 
     def add_api_key_sync(self, key_hash: str, user_id: str) -> None:
+        self._keys[key_hash] = user_id
+
+    async def add_api_key(self, key_hash: str, user_id: str) -> None:
         self._keys[key_hash] = user_id
 
 
@@ -93,3 +98,6 @@ class FirestoreUsageStore(UsageStore):
         if not snapshot.exists:
             return None
         return snapshot.get("user_id")
+
+    async def add_api_key(self, key_hash: str, user_id: str) -> None:
+        await self._db.collection("apikeys").document(key_hash).set({"user_id": user_id})
