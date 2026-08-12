@@ -54,7 +54,7 @@ variable "model_replicas" {
 
 variable "clerk_jwks_url" {
   type    = string
-  default = "https://sincere-redfish-88.clerk.accounts.dev/.well-known/jwks.json"
+  default = "https://humble-arachnid-95.clerk.accounts.dev/.well-known/jwks.json"
 }
 
 variable "free_tier_monthly_limit" {
