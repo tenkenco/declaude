@@ -18,12 +18,15 @@ class UsageStore(ABC):
     async def is_paid(self, user_id: str) -> bool: ...
     @abstractmethod
     async def set_paid(self, user_id: str, paid: bool) -> None: ...
+    @abstractmethod
+    async def get_user_for_key(self, key_hash: str) -> str | None: ...
 
 
 class InMemoryUsageStore(UsageStore):
     def __init__(self):
         self._counts: dict[tuple[str, str], int] = {}
         self._paid: set[str] = set()
+        self._keys: dict[str, str] = {}
 
     async def increment(self, user_id: str, period: str) -> int:
         key = (user_id, period)
@@ -45,6 +48,12 @@ class InMemoryUsageStore(UsageStore):
 
     def mark_paid_sync(self, user_id: str) -> None:
         self._paid.add(user_id)
+
+    async def get_user_for_key(self, key_hash: str) -> str | None:
+        return self._keys.get(key_hash)
+
+    def add_api_key_sync(self, key_hash: str, user_id: str) -> None:
+        self._keys[key_hash] = user_id
 
 
 class FirestoreUsageStore(UsageStore):
@@ -78,3 +87,9 @@ class FirestoreUsageStore(UsageStore):
 
     async def set_paid(self, user_id: str, paid: bool) -> None:
         await self._db.collection("users").document(user_id).set({"paid": paid}, merge=True)
+
+    async def get_user_for_key(self, key_hash: str) -> str | None:
+        snapshot = await self._db.collection("apikeys").document(key_hash).get()
+        if not snapshot.exists:
+            return None
+        return snapshot.get("user_id")

@@ -1,4 +1,5 @@
 """FastAPI application factory. All external dependencies are injected."""
+import base64
 from collections.abc import Callable
 from typing import Annotated
 
@@ -8,6 +9,7 @@ from pydantic import BaseModel, field_validator
 
 from .auth import Authenticator
 from .config import Settings
+from .keys import hash_key
 from .landing import LANDING_HTML
 from .model import ModelClient
 from .prompts import SYSTEM_PROMPT
@@ -63,12 +65,28 @@ def create_app(
     app = FastAPI(title="declaude", version="0.1.0")
     verify_webhook = webhook_verifier or default_webhook_verifier
 
+    async def _resolve_api_key(key: str) -> str:
+        user_id = await usage.get_user_for_key(hash_key(key))
+        if user_id is None:
+            raise HTTPException(401, "invalid api key")
+        return user_id
+
     async def authenticate(request: Request) -> str:
         header = request.headers.get("Authorization", "")
+        if header.startswith("Basic "):
+            # curl userinfo (https://x:KEY@host) arrives as Basic base64("x:KEY")
+            try:
+                _, _, key = base64.b64decode(header.removeprefix("Basic ")).decode().partition(":")
+            except Exception as exc:
+                raise HTTPException(401, "malformed basic auth") from exc
+            return await _resolve_api_key(key)
         if not header.startswith("Bearer "):
             raise HTTPException(401, "missing bearer token")
+        token = header.removeprefix("Bearer ")
+        if token.startswith("dk_"):
+            return await _resolve_api_key(token)
         try:
-            return await auth.verify(header.removeprefix("Bearer "))
+            return await auth.verify(token)
         except Exception as exc:
             raise HTTPException(401, "invalid token") from exc
 
@@ -157,6 +175,36 @@ def create_app(
         elif event_type == "customer.subscription.deleted" and user_id:
             await usage.set_paid(user_id, False)
         return {"received": True}
+
+    # ---- Ollama-compatible surface (claudish-to-english plugin & friends) ----
+
+    @app.post("/api/chat")
+    async def ollama_chat(request: Request, user_id: UserId, response: Response):
+        body = await request.json()
+        messages = body.get("messages") or []
+        system = next((m.get("content", "") for m in messages if m.get("role") == "system"), SYSTEM_PROMPT)
+        prompt = next((m.get("content", "") for m in reversed(messages) if m.get("role") == "user"), "")
+        if not prompt.strip():
+            raise HTTPException(422, "no user message")
+        if len(prompt) > settings.max_input_chars:
+            raise HTTPException(422, f"text exceeds {settings.max_input_chars} characters")
+        free_tier = await check_quota(user_id)
+        try:
+            content = await model.complete(system, prompt)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(
+                503,
+                {"error": "model backend is unavailable or warming up; retry shortly"},
+                headers={"Retry-After": "30"},
+            ) from exc
+        await record_usage(user_id, free_tier, response)
+        return {
+            "model": settings.model_name,
+            "message": {"role": "assistant", "content": content},
+            "done": True,
+        }
 
     # ---- MCP (JSON-RPC 2.0 over HTTP) ----
 
