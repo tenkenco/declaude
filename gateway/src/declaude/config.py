@@ -11,6 +11,7 @@ class Settings(BaseModel):
     max_input_chars: int = 50_000
     stripe_payment_link: str = ""
     price_usd_per_month: str = "5.00"
+    clerk_publishable_key: str = ""
 
     @classmethod
     def from_env(cls) -> "Settings":

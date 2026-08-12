@@ -44,6 +44,7 @@ pre{
   padding:1rem 1.25rem;overflow-x:auto;font-size:.85rem;line-height:1.55;margin:.75rem 0;
 }
 pre code{color:#d2d8e0}
+.cta{margin-top:1.75rem;font-size:1.02rem}
 .hint{color:var(--muted);font-size:.9rem}
 .hint code{background:var(--code-bg);border:1px solid var(--border);border-radius:5px;padding:.1rem .35rem;font-size:.82em}
 ul.pricing{list-style:none;display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-top:1.25rem}
@@ -71,6 +72,7 @@ footer nav{display:flex;gap:1.5rem;flex-wrap:wrap}
     <div class="after"><p class="label">After</p>
       <p>Sure. Here's an overview of the topic.</p></div>
   </div>
+  <p class="cta"><a href="/signin">Sign in and get an API key</a> — free for 100 translations a month.</p>
 </header>
 
 <section id="mcp">
@@ -78,16 +80,17 @@ footer nav{display:flex;gap:1.5rem;flex-wrap:wrap}
   <p class="lead">Add declaude to any MCP client over HTTP. The tool <code>translate</code> is exposed at <code>/mcp</code>.</p>
   <pre><code>claude mcp add --transport http declaude \\
   https://declaude-gateway-477468296053.us-central1.run.app/mcp \\
-  --header "Authorization: Bearer &lt;clerk session token&gt;"</code></pre>
-  <p class="hint">Authenticate with a Clerk session token in the
-  <code>Authorization: Bearer</code> header.</p>
+  --header "Authorization: Bearer &lt;your api key&gt;"</code></pre>
+  <p class="hint">Authenticate with an API key in the
+  <code>Authorization: Bearer</code> header.
+  <a href="/signin">Sign in to get a key</a> — it does not expire.</p>
 </section>
 
 <section id="api">
   <h2>Quickstart: REST API</h2>
   <p class="lead">One endpoint: <code>POST /v1/translate</code>. Send text, get plain English back.</p>
   <pre><code>curl -X POST https://declaude-gateway-477468296053.us-central1.run.app/v1/translate \\
-  -H "Authorization: Bearer &lt;clerk session token&gt;" \\
+  -H "Authorization: Bearer &lt;your api key&gt;" \\
   -H "Content-Type: application/json" \\
   -d '{"text": "Certainly! Let me delve into that."}'
 

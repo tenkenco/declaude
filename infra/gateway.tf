@@ -93,6 +93,10 @@ resource "google_cloud_run_v2_service" "gateway" {
         value = var.clerk_jwks_url
       }
       env {
+        name  = "DECLAUDE_CLERK_PUBLISHABLE_KEY"
+        value = var.clerk_publishable_key
+      }
+      env {
         name = "STRIPE_SECRET_KEY"
         value_source {
           secret_key_ref {

@@ -63,6 +63,12 @@ variable "clerk_jwks_url" {
   default = "https://humble-arachnid-95.clerk.accounts.dev/.well-known/jwks.json"
 }
 
+variable "clerk_publishable_key" {
+  description = "Clerk publishable key. Public by design; the sign-in page ships it to the browser."
+  type        = string
+  default     = "pk_test_aHVtYmxlLWFyYWNobmlkLTk1LmNsZXJrLmFjY291bnRzLmRldiQ="
+}
+
 variable "free_tier_monthly_limit" {
   type    = number
   default = 100

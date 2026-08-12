@@ -20,7 +20,6 @@ jobs:
       - name: Test
         run: uv run pytest -q
 
-<<<<<<< Updated upstream
   hook:
     runs-on: ubuntu-latest
     steps:
@@ -29,7 +28,7 @@ jobs:
       - name: Test hook client
         working-directory: hook
         run: uv run --no-project --with pytest pytest -q .
-=======
+
   infra:
     runs-on: ubuntu-latest
     steps:
@@ -41,4 +40,3 @@ jobs:
       - name: validate (no backend)
         working-directory: infra
         run: terraform init -backend=false -input=false && terraform validate
->>>>>>> Stashed changes

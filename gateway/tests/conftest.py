@@ -3,7 +3,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from declaude.app import create_app
+from declaude.auth import ApiKeyAuthenticator, CompositeAuthenticator
 from declaude.config import Settings
+from declaude.keys import InMemoryApiKeyStore
 from declaude.model import ModelClient
 from declaude.usage import InMemoryUsageStore
 
@@ -39,13 +41,23 @@ def usage():
 
 
 @pytest.fixture
-def settings():
-    return Settings(free_tier_monthly_limit=3, stripe_payment_link="https://buy.stripe.com/test_declaude")
+def api_keys():
+    return InMemoryApiKeyStore()
 
 
 @pytest.fixture
-def client(model, usage, settings):
-    app = create_app(model=model, auth=FakeAuth(), usage=usage, settings=settings)
+def settings():
+    return Settings(
+        free_tier_monthly_limit=3,
+        stripe_payment_link="https://buy.stripe.com/test_declaude",
+        clerk_publishable_key="pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk",
+    )
+
+
+@pytest.fixture
+def client(model, usage, settings, api_keys):
+    auth = CompositeAuthenticator(api_key=ApiKeyAuthenticator(api_keys), clerk=FakeAuth())
+    app = create_app(model=model, auth=auth, usage=usage, settings=settings, api_keys=api_keys)
     return TestClient(app)
 
 

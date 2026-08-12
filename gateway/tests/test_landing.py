@@ -27,5 +27,10 @@ def test_root_has_quickstart_and_pricing(client):
     assert "github.com/tenkenco/declaude" in body
 
 
+def test_root_links_to_signin(client):
+    """Users must have a route to a key; the landing page is the only entry point."""
+    assert 'href="/signin"' in client.get("/").text
+
+
 def test_root_is_lightweight(client):
     assert len(client.get("/").content) < 15 * 1024

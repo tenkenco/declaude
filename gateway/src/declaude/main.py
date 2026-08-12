@@ -8,8 +8,14 @@ STRIPE_WEBHOOK_SECRET enables Stripe webhook signature verification.
 import os
 
 from .app import create_app, default_webhook_verifier
-from .auth import Authenticator, ClerkAuthenticator
+from .auth import (
+    ApiKeyAuthenticator,
+    Authenticator,
+    ClerkAuthenticator,
+    CompositeAuthenticator,
+)
 from .config import Settings
+from .keys import ApiKeyStore, FirestoreApiKeyStore, InMemoryApiKeyStore
 from .model import OpenAICompatClient
 from .usage import FirestoreUsageStore, InMemoryUsageStore, UsageStore
 
@@ -26,23 +32,36 @@ class DevAuthenticator(Authenticator):
         return "dev_user"
 
 
+def _firestore_client():
+    from google.cloud import firestore
+
+    return firestore.AsyncClient(project=os.environ.get("GOOGLE_CLOUD_PROJECT"))
+
+
 def build_usage_store() -> UsageStore:
     if os.environ.get("DECLAUDE_USAGE_BACKEND", "memory") == "firestore":
-        from google.cloud import firestore
-
-        return FirestoreUsageStore(firestore.AsyncClient(project=os.environ.get("GOOGLE_CLOUD_PROJECT")))
+        return FirestoreUsageStore(_firestore_client())
     return InMemoryUsageStore()
+
+
+def build_api_key_store() -> ApiKeyStore:
+    """Keys share the usage backend: both are per-user state that must survive a restart."""
+    if os.environ.get("DECLAUDE_USAGE_BACKEND", "memory") == "firestore":
+        return FirestoreApiKeyStore(_firestore_client())
+    return InMemoryApiKeyStore()
 
 
 def build_app():
     settings = Settings.from_env()
+    api_keys = build_api_key_store()
     if os.environ.get("DECLAUDE_AUTH_MODE", "clerk") == "dev":
-        auth: Authenticator = DevAuthenticator(os.environ.get("DECLAUDE_DEV_TOKEN", ""))
+        session_auth: Authenticator = DevAuthenticator(os.environ.get("DECLAUDE_DEV_TOKEN", ""))
     else:
-        auth = ClerkAuthenticator(
+        session_auth = ClerkAuthenticator(
             jwks_url=os.environ["CLERK_JWKS_URL"],
             authorized_parties=[p for p in os.environ.get("CLERK_AUTHORIZED_PARTIES", "").split(",") if p],
         )
+    auth = CompositeAuthenticator(api_key=ApiKeyAuthenticator(api_keys), clerk=session_auth)
     model = OpenAICompatClient(base_url=settings.model_base_url, model=settings.model_name)
     return create_app(
         model=model,
@@ -50,6 +69,7 @@ def build_app():
         usage=build_usage_store(),
         settings=settings,
         webhook_verifier=default_webhook_verifier,
+        api_keys=api_keys,
     )
 
 

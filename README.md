@@ -12,6 +12,9 @@ instead of local Ollama.
 
 ## Use it
 
+**Get a key**: open `/signin`, sign in with Clerk, and select **Create an API key**.
+The key is shown once and does not expire. Set it as `DECLAUDE_TOKEN`.
+
 **Landing / docs**: open the production URL in a browser.
 
 **MCP** (Claude Code, Cursor, any MCP client):
@@ -41,7 +44,8 @@ users are unmetered.
 ## Architecture
 
 ```
-client ── Clerk JWT ──> Cloud Run gateway ── VPC ──> internal L7 LB ──> vLLM GPU MIG
+client ── API key ────> Cloud Run gateway ── VPC ──> internal L7 LB ──> vLLM GPU MIG
+browser ─ Clerk JWT ──>   (mints keys at POST /v1/keys)
                           │                                             (Qwen2.5-32B-AWQ, L4)
                           ├─> Firestore (usage/paid flags)
                           └─> Stripe (payment link + signed webhooks)
