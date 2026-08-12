@@ -134,7 +134,9 @@ resource "google_cloud_run_v2_service" "gateway" {
   depends_on = [google_secret_manager_secret_iam_member.gateway_access]
 
   lifecycle {
-    ignore_changes = [template[0].containers[0].image] # CI deploys images
+    # CI (gcloud run deploy) owns the image and adds a service-level scaling block;
+    # Terraform must not fight it on every plan.
+    ignore_changes = [template[0].containers[0].image, scaling, client, client_version]
   }
 }
 
