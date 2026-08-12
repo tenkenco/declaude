@@ -71,7 +71,7 @@ resource "google_compute_region_instance_group_manager" "vllm" {
   base_instance_name = "vllm"
   target_size        = var.model_replicas
 
-  distribution_policy_zones = [var.zone]
+  distribution_policy_zones = var.model_zones
 
   version {
     instance_template = google_compute_instance_template.vllm.id

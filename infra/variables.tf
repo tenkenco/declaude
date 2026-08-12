@@ -13,6 +13,12 @@ variable "zone" {
   default = "us-central1-a"
 }
 
+variable "model_zones" {
+  description = "Zones the model MIG may use; spread wide since L4 capacity varies by zone."
+  type        = list(string)
+  default     = ["us-central1-a", "us-central1-b", "us-central1-c"]
+}
+
 variable "model_machine_type" {
   description = "GPU machine type for vLLM. g2-standard-8 = 1x L4 (24GB). Bump to g2-standard-24 (2x L4) after quota increase."
   type        = string
