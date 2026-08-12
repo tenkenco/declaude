@@ -102,6 +102,7 @@ def create_app(
         return await model.complete(SYSTEM_PROMPT, text)
 
     @app.get("/healthz")
+    @app.get("/health")  # /healthz is intercepted by the Google Frontend on run.app URLs
     async def healthz():
         return {"status": "ok", "model": settings.model_name}
 

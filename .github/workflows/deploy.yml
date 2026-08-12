@@ -1,0 +1,47 @@
+name: Deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency: deploy-prod
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Test before deploy
+        working-directory: gateway
+        run: uv sync --dev && uv run ruff check . && uv run pytest -q
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/477468296053/locations/global/workloadIdentityPools/github/providers/github-oidc
+          service_account: github-deployer@declaude-prod.iam.gserviceaccount.com
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Build and push image
+        run: |
+          gcloud auth configure-docker us-central1-docker.pkg.dev -q
+          IMAGE=us-central1-docker.pkg.dev/declaude-prod/declaude/gateway
+          docker build -t "$IMAGE:${GITHUB_SHA::12}" -t "$IMAGE:latest" gateway
+          docker push "$IMAGE:${GITHUB_SHA::12}"
+          docker push "$IMAGE:latest"
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy declaude-gateway \
+            --project declaude-prod --region us-central1 \
+            --image us-central1-docker.pkg.dev/declaude-prod/declaude/gateway:${GITHUB_SHA::12}
+      - name: Smoke test
+        run: |
+          sleep 10
+          curl -sf https://declaude-gateway-477468296053.us-central1.run.app/health
+          code=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+            https://declaude-gateway-477468296053.us-central1.run.app/v1/translate \
+            -H "Content-Type: application/json" -d '{"text":"smoke"}')
+          test "$code" = "401"  # unauthenticated must be rejected, not 5xx
