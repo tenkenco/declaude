@@ -94,7 +94,10 @@ resource "google_compute_region_instance_group_manager" "vllm" {
   }
 
   update_policy {
-    type                  = "PROACTIVE"
+    # OPPORTUNISTIC: template changes must NOT auto-replace the single GPU instance
+    # (each replacement = ~15 min model reload). Roll deliberately with:
+    #   gcloud compute instance-groups managed rolling-action replace vllm-mig --region us-east1
+    type                  = "OPPORTUNISTIC"
     minimal_action        = "REPLACE"
     max_surge_fixed       = 0
     max_unavailable_fixed = 3
