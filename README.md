@@ -2,66 +2,67 @@
 
 **Claude-English → plain English, as a service.**
 
-An API + MCP server that rewrites "Claude English" (sycophantic openers, hedging
-filler, bullet addiction) into natural prose — inspired by
-[gvzdv/claudish-to-english](https://github.com/gvzdv/claudish-to-english), but backed
-by a larger open-source model (Qwen2.5-32B-Instruct-AWQ) on dedicated GCP infrastructure
-instead of local Ollama.
+Declaude is a translation service that rewrites the distinctive, sycophantic writing style of AI assistants into plain, natural English. The service uses a robust open-source model (Qwen2.5-14B) running on dedicated GPU infrastructure, ensuring that your data never touches a commercial AI provider. It offers a generous free tier of 100 translations per month, with unlimited usage available for just $5 per month. Developers can integrate Declaude through a REST API, an MCP server, or a drop-in Claude Code plugin.
 
-**Production**: https://declaude-gateway-477468296053.us-central1.run.app (project `declaude-prod`)
+**Live**: [speak-english.tenken.co](https://speak-english.tenken.co) · [Get an API key](https://speak-english.tenken.co/signin)
 
-## Use it
+> The paragraph above was written by an AI assistant, then rewritten by declaude itself.
 
-**Landing / docs**: open the production URL in a browser.
+## Quick start
 
-**MCP** (Claude Code, Cursor, any MCP client):
-```
-claude mcp add --transport http declaude \
-  https://declaude-gateway-477468296053.us-central1.run.app/mcp \
-  --header "Authorization: Bearer $DECLAUDE_TOKEN"
-```
+**1. Get a key** — sign in at [/signin](https://speak-english.tenken.co/signin). Keys don't expire.
 
-**HTTP API**:
-```
-curl -X POST https://declaude-gateway-477468296053.us-central1.run.app/v1/translate \
+**2. Pick your surface:**
+
+```bash
+# REST
+curl -X POST https://speak-english.tenken.co/v1/translate \
   -H "Authorization: Bearer $DECLAUDE_TOKEN" -H "Content-Type: application/json" \
   -d '{"text": "Great question! It is worth noting that..."}'
 ```
 
-**Claude Code hook**: see [hook/](hook/) — attaches a plain-English rendition to every
-completed response; fails open.
+```bash
+# MCP (Claude Code, Cursor, any MCP client)
+claude mcp add --transport http declaude https://speak-english.tenken.co/mcp \
+  --header "Authorization: Bearer $DECLAUDE_TOKEN"
+```
 
-## Pricing (x402 pattern)
+```bash
+# claudish-to-english plugin (drop-in, no local Ollama needed)
+export CLAUDISH_OLLAMA="https://x:$DECLAUDE_TOKEN@speak-english.tenken.co"
+export CLAUDISH_MODEL="qwen2.5-14b-instruct"
+```
 
-100 free translations/month per user (only successful translations count). Past that,
-requests return **HTTP 402** with a machine-readable payment challenge
-(`accepts[0].url` → Stripe payment link, $5/mo). Webhook flips the paid flag; paid
-users are unmetered.
+Also: [hook/](hook/) for a standalone Claude Code Stop-hook, and [skills/declaude/](skills/declaude/) to
+install declaude as an agent skill.
+
+## Pricing
+
+100 translations/month free. Past that, requests return `402` with a machine-readable
+payment challenge and an `upgrade_url` → [$5/month, unlimited](https://speak-english.tenken.co/upgrade).
+Only successful translations count against quota.
 
 ## Architecture
 
 ```
-client ── Clerk JWT ──> Cloud Run gateway ── VPC ──> internal L7 LB ──> vLLM GPU MIG
-                          │                                             (Qwen2.5-32B-AWQ, L4)
-                          ├─> Firestore (usage/paid flags)
-                          └─> Stripe (payment link + signed webhooks)
+client ── API key / Clerk JWT ──> Cloud Run gateway ── VPC ──> internal LB ──> vLLM GPU MIG
+                                     │                                        (Qwen2.5-14B, spot L4)
+                                     ├─> Firestore (usage, paid flags, key hashes)
+                                     └─> Stripe (payment link + signed webhooks)
 ```
 
-- **gateway/** — FastAPI: `/v1/translate`, `/mcp` (JSON-RPC 2.0), `/v1/billing/webhook`,
-  `/health`. Clerk JWKS auth; every external boundary injectable (TDD: 43 tests).
-- **infra/** — Terraform (state: `gs://declaude-prod-tfstate`). Model tier is private-IP-only
-  behind an internal load balancer; scale via `model_replicas` / machine type vars.
-- **hook/** — end-user Claude Code hook client.
-- **CI/CD** — GitHub Actions: lint + tests on PR; on main: test → build → deploy to Cloud Run
-  via Workload Identity Federation (no stored keys) → smoke test.
+- **gateway/** — FastAPI: `/v1/translate`, `/mcp`, `/api/chat` (Ollama-compatible), `/v1/keys`,
+  `/v1/billing/webhook`, `/signin`, `/upgrade`, `/health`. 86 tests; every boundary injectable.
+- **infra/** — Terraform, state in GCS, plan converges to zero diff. GPU tier is private-IP spot
+  instances behind an internal L7 LB; template rollouts are deliberate (OPPORTUNISTIC).
+- **hook/** — Claude Code hook client (fails open; never blocks a session).
+- **CI/CD** — PRs: lint + tests (gateway/hook/infra). Main: test → build → deploy via Workload
+  Identity Federation → smoke test.
 
-## Operations
+## Operating notes
 
-- Secrets live in Secret Manager (`clerk-secret-key`, `stripe-*`); never in state or env files.
-- Monitoring: uptime check on `/health` + email alert; $500/mo budget with 50/90/100% alerts.
-- Known constraint: L4 capacity in us-central1 flaps; the MIG chases zones a/b/c
-  (`ZONE_RESOURCE_POOL_EXHAUSTED` self-heals). GPU quota: 1 (bump via quota preferences
-  for multi-replica or 2×L4 32B-full-context serving).
-- `/healthz` is intercepted by Google Frontend on run.app — always use `/health` externally.
-
-Developed test-first; every defect found in dogfooding lands as a regression test before the fix.
+- `/healthz` is reserved by Google Frontend on run.app — use `/health`.
+- Model swaps are one Terraform variable; 32B needs 2×L4 (quota bump), 14B fits one L4.
+- Secrets live in Secret Manager only. API keys are stored as SHA-256 digests.
+- Developed strictly test-first; every production defect found in dogfooding became a
+  regression test before its fix.
