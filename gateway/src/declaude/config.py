@@ -10,6 +10,7 @@ class Settings(BaseModel):
     free_tier_monthly_limit: int = 100
     max_input_chars: int = 50_000
     stripe_payment_link: str = ""
+    clerk_publishable_key: str = ""
     price_usd_per_month: str = "5.00"
 
     @classmethod

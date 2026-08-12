@@ -11,6 +11,7 @@ from .app import create_app, default_webhook_verifier
 from .auth import Authenticator, ClerkAuthenticator
 from .config import Settings
 from .model import OpenAICompatClient
+from .signin import publishable_key_from_jwks
 from .usage import FirestoreUsageStore, InMemoryUsageStore, UsageStore
 
 
@@ -36,6 +37,10 @@ def build_usage_store() -> UsageStore:
 
 def build_app():
     settings = Settings.from_env()
+    if not settings.clerk_publishable_key and os.environ.get("CLERK_JWKS_URL"):
+        # /signin derives the publishable key from the JWKS host: same Clerk frontend,
+        # no second config value to keep in sync.
+        settings.clerk_publishable_key = publishable_key_from_jwks(os.environ["CLERK_JWKS_URL"])
     if os.environ.get("DECLAUDE_AUTH_MODE", "clerk") == "dev":
         auth: Authenticator = DevAuthenticator(os.environ.get("DECLAUDE_DEV_TOKEN", ""))
     else:

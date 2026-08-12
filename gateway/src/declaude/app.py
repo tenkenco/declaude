@@ -9,10 +9,11 @@ from pydantic import BaseModel, field_validator
 
 from .auth import Authenticator
 from .config import Settings
-from .keys import hash_key
+from .keys import generate_key, hash_key
 from .landing import LANDING_HTML
 from .model import ModelClient
 from .prompts import SYSTEM_PROMPT
+from .signin import signin_html
 from .usage import UsageStore, current_period
 
 PROTOCOL_VERSION = "2025-03-26"
@@ -92,6 +93,15 @@ def create_app(
 
     UserId = Annotated[str, Depends(authenticate)]
 
+    async def authenticate_session(request: Request) -> str:
+        """Clerk session JWTs only: an API key must not be able to mint another key."""
+        header = request.headers.get("Authorization", "")
+        if header.startswith("Basic ") or header.removeprefix("Bearer ").startswith("dk_"):
+            raise HTTPException(403, "api keys cannot mint keys; sign in at /signin")
+        return await authenticate(request)
+
+    SessionUserId = Annotated[str, Depends(authenticate_session)]
+
     def payment_challenge() -> HTTPException:
         body = {
             "error": "payment_required",
@@ -138,6 +148,17 @@ def create_app(
     @app.get("/", include_in_schema=False)
     async def landing() -> HTMLResponse:
         return HTMLResponse(LANDING_HTML)
+
+    @app.get("/signin", include_in_schema=False)
+    async def signin():
+        return HTMLResponse(signin_html(settings.clerk_publishable_key))
+
+    @app.post("/v1/keys")
+    async def create_api_key(user_id: SessionUserId):
+        """Mint a long-lived API key. The plaintext is returned once and never stored."""
+        key = generate_key()
+        await usage.add_api_key(hash_key(key), user_id)
+        return {"key": key}
 
     @app.get("/healthz")
     @app.get("/health")  # /healthz is intercepted by the Google Frontend on run.app URLs

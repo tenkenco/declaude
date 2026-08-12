@@ -40,7 +40,11 @@ def usage():
 
 @pytest.fixture
 def settings():
-    return Settings(free_tier_monthly_limit=3, stripe_payment_link="https://buy.stripe.com/test_declaude")
+    return Settings(
+        free_tier_monthly_limit=3,
+        stripe_payment_link="https://buy.stripe.com/test_declaude",
+        clerk_publishable_key="pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk",  # example.clerk.accounts.dev$
+    )
 
 
 @pytest.fixture
