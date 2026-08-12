@@ -104,3 +104,28 @@ async def test_verifier_receives_raw_body_and_signature(client, verifier):
     verifier.event = {"type": "ping", "data": {"object": {}}}
     post_webhook(client, body=b'{"raw": true}', sig="t=9,v1=zzz")
     assert verifier.calls[-1] == (b'{"raw": true}', "t=9,v1=zzz")
+
+
+def test_default_verifier_returns_plain_dict(monkeypatch):
+    """Prod finding: stripe.Webhook.construct_event returns a StripeObject whose
+    `.get` lookup can raise; the verifier must hand the handler a plain dict."""
+    import json
+    import time
+
+    import stripe
+
+    from declaude.app import default_webhook_verifier
+
+    secret = "whsec_testsecret"
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", secret)
+    payload = json.dumps({
+        "id": "evt_1", "object": "event", "api_version": stripe.api_version,
+        "type": "checkout.session.completed",
+        "data": {"object": {"object": "checkout.session", "metadata": {"clerk_user_id": "user_x"}}},
+    }).encode()
+    ts = int(time.time())
+    sig = stripe.WebhookSignature._compute_signature(f"{ts}.{payload.decode()}", secret)
+    event = default_webhook_verifier(payload, f"t={ts},v1={sig}")
+    assert type(event) is dict
+    assert event.get("type") == "checkout.session.completed"
+    assert event["data"]["object"]["metadata"]["clerk_user_id"] == "user_x"
