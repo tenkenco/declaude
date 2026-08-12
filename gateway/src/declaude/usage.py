@@ -1,11 +1,11 @@
 """Per-user, per-month usage metering and paid-plan flags.
 InMemory for tests/dev; Firestore-backed implementation used in production."""
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def current_period() -> str:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return f"{now.year:04d}-{now.month:02d}"
 
 

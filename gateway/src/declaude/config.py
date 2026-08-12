@@ -1,6 +1,7 @@
 """Runtime settings. All values overridable via environment variables (DECLAUDE_ prefix)."""
-from pydantic import BaseModel
 import os
+
+from pydantic import BaseModel
 
 
 class Settings(BaseModel):

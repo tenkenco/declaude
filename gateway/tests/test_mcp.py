@@ -45,3 +45,10 @@ def test_mcp_call_counts_against_quota(client, usage, settings):
         rpc(client, "tools/call", {"name": "translate", "arguments": {"text": "hi"}})
     r = rpc(client, "tools/call", {"name": "translate", "arguments": {"text": "hi"}})
     assert r.status_code == 402
+
+
+def test_mcp_malformed_json_is_parse_error_not_500(client):
+    """Dogfood finding: raw garbage bytes must yield JSON-RPC -32700, never a 500."""
+    r = client.post("/mcp", content=b"><", headers={**AUTH, "Content-Type": "application/json"})
+    assert r.status_code == 400
+    assert r.json()["error"]["code"] == -32700
