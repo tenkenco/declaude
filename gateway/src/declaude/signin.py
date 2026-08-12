@@ -185,6 +185,22 @@ def signin_html(publishable_key: str, clerk_js_url: str = "") -> str:
     return _PAGE.format(pk=publishable_key, clerk_js=clerk_js_url or clerk_js_for(publishable_key))
 
 
+def publishable_key_from_jwks(jwks_url: str) -> str:
+    """Derive the publishable key from the JWKS URL.
+
+    Both values encode the same Clerk frontend host, and the JWKS URL is already set in
+    production. Deriving it keeps /signin working after an image-only deploy, so the page
+    never depends on a separate Terraform apply."""
+    import base64
+    from urllib.parse import urlparse
+
+    host = urlparse(jwks_url).hostname or ""
+    if not host:
+        return ""
+    prefix = "pk_test_" if host.endswith(".accounts.dev") else "pk_live_"
+    return prefix + base64.b64encode(f"{host}$".encode()).decode()
+
+
 def clerk_js_for(publishable_key: str) -> str:
     """Derive the ClerkJS bundle URL from the publishable key.
 

@@ -17,6 +17,7 @@ from .auth import (
 from .config import Settings
 from .keys import ApiKeyStore, FirestoreApiKeyStore, InMemoryApiKeyStore
 from .model import OpenAICompatClient
+from .signin import publishable_key_from_jwks
 from .usage import FirestoreUsageStore, InMemoryUsageStore, UsageStore
 
 
@@ -53,6 +54,10 @@ def build_api_key_store() -> ApiKeyStore:
 
 def build_app():
     settings = Settings.from_env()
+    if not settings.clerk_publishable_key:
+        settings = settings.model_copy(
+            update={"clerk_publishable_key": publishable_key_from_jwks(os.environ.get("CLERK_JWKS_URL", ""))}
+        )
     api_keys = build_api_key_store()
     if os.environ.get("DECLAUDE_AUTH_MODE", "clerk") == "dev":
         session_auth: Authenticator = DevAuthenticator(os.environ.get("DECLAUDE_DEV_TOKEN", ""))

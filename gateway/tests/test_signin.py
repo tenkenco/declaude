@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 from declaude.app import create_app
 from declaude.config import Settings
-from declaude.signin import clerk_js_for, signin_html
+from declaude.signin import clerk_js_for, publishable_key_from_jwks, signin_html
 
 PK = "pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk"  # base64 of "example.clerk.accounts.dev$"
 
@@ -57,3 +57,26 @@ def test_signin_page_is_lightweight(client):
 
 def test_signin_html_never_leaks_a_secret_key():
     assert "sk_" not in signin_html(PK)
+
+
+# The deploy pipeline pushes an image only; it never applies Terraform. Deriving the
+# publishable key from the JWKS URL keeps /signin working without a second deploy step.
+
+
+def test_publishable_key_derives_from_a_dev_jwks_url():
+    url = "https://humble-arachnid-95.clerk.accounts.dev/.well-known/jwks.json"
+    assert publishable_key_from_jwks(url) == "pk_test_aHVtYmxlLWFyYWNobmlkLTk1LmNsZXJrLmFjY291bnRzLmRldiQ="
+
+
+def test_derived_key_round_trips_to_the_same_host():
+    url = "https://humble-arachnid-95.clerk.accounts.dev/.well-known/jwks.json"
+    derived = publishable_key_from_jwks(url)
+    assert clerk_js_for(derived).startswith("https://humble-arachnid-95.clerk.accounts.dev/npm/")
+
+
+def test_custom_domain_derives_a_live_key():
+    assert publishable_key_from_jwks("https://clerk.declaude.dev/.well-known/jwks.json").startswith("pk_live_")
+
+
+def test_missing_jwks_url_derives_nothing():
+    assert publishable_key_from_jwks("") == ""
