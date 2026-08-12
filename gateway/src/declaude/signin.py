@@ -97,7 +97,21 @@ function show(el, on) {{ el.hidden = !on; }}
 async function start() {{
   clerk = window.Clerk;
   try {{
-    await clerk.load();
+    // Match the page. Without this the widget renders light on a dark background.
+    await clerk.load({{
+      appearance: {{
+        variables: {{
+          colorBackground: "#11151f",
+          colorInputBackground: "#0d1117",
+          colorText: "#e6e9ef",
+          colorTextSecondary: "#9aa4b2",
+          colorInputText: "#e6e9ef",
+          colorPrimary: "#f97316",
+          colorNeutral: "#e6e9ef",
+          borderRadius: "8px",
+        }},
+      }},
+    }});
   }} catch (e) {{
     failed();
     return;
