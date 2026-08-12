@@ -4,7 +4,13 @@ from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+)
+from fastapi.responses import Response as RawResponse
 from pydantic import BaseModel, field_validator
 
 from .auth import Authenticator
@@ -13,6 +19,7 @@ from .keys import generate_key, hash_key
 from .landing import LANDING_HTML
 from .model import ModelClient
 from .prompts import SYSTEM_PROMPT
+from .seo import head_tags, json_ld, robots_txt, sitemap_xml
 from .signin import signin_html
 from .usage import UsageStore, current_period
 
@@ -106,6 +113,7 @@ def create_app(
         body = {
             "error": "payment_required",
             "message": f"Free tier of {settings.free_tier_monthly_limit} translations/month exceeded.",
+            "upgrade_url": settings.public_base_url.rstrip("/") + "/upgrade",
             "accepts": [
                 {
                     "scheme": "stripe-payment-link",
@@ -145,13 +153,45 @@ def create_app(
                 headers={"Retry-After": "30"},
             ) from exc
 
+    def _with_seo(html: str, *, title: str, description: str, path: str) -> str:
+        extra = head_tags(settings.public_base_url, settings.ga_measurement_id,
+                          title=title, description=description, path=path)
+        if path == "/":
+            extra += json_ld(settings.public_base_url, settings.price_usd_per_month)
+        return html.replace("</head>", extra + "\n</head>", 1)
+
     @app.get("/", include_in_schema=False)
     async def landing() -> HTMLResponse:
-        return HTMLResponse(LANDING_HTML)
+        return HTMLResponse(_with_seo(
+            LANDING_HTML,
+            title="declaude — Claude-English to plain English",
+            description="API and MCP server that rewrites Claude-English into plain, natural English. 100 free translations a month.",
+            path="/",
+        ))
+
+    @app.get("/robots.txt", include_in_schema=False)
+    async def robots() -> PlainTextResponse:
+        return PlainTextResponse(robots_txt(settings.public_base_url))
+
+    @app.get("/sitemap.xml", include_in_schema=False)
+    async def sitemap() -> RawResponse:
+        return RawResponse(content=sitemap_xml(settings.public_base_url), media_type="application/xml")
+
+    @app.get("/upgrade", include_in_schema=False)
+    async def upgrade():
+        """Stable human-facing upgrade URL; 402 payloads and hook notices can always point here."""
+        if settings.stripe_payment_link:
+            return RedirectResponse(settings.stripe_payment_link, status_code=307)
+        return HTMLResponse("<h1>declaude Pro</h1><p>Payments are not configured yet. Contact the operator.</p>")
 
     @app.get("/signin", include_in_schema=False)
     async def signin():
-        return HTMLResponse(signin_html(settings.clerk_publishable_key))
+        return HTMLResponse(_with_seo(
+            signin_html(settings.clerk_publishable_key),
+            title="declaude — sign in and get your API key",
+            description="Sign in once, mint a permanent API key for the declaude translation API and MCP server.",
+            path="/signin",
+        ))
 
     @app.post("/v1/keys")
     async def create_api_key(user_id: SessionUserId):
