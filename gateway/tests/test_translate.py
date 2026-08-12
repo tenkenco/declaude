@@ -40,3 +40,13 @@ def test_health_alias_is_public(client):
     r = client.get("/health")
     assert r.status_code == 200
     assert r.json()["status"] == "ok"
+
+
+def test_model_backend_failure_maps_to_503(client, model, monkeypatch):
+    """A dead/warming model backend must surface as 503, not a raw 500."""
+    async def boom(system, prompt):
+        raise RuntimeError("connection refused")
+    monkeypatch.setattr(model, "complete", boom)
+    r = client.post("/v1/translate", json={"text": "hi"}, headers={"Authorization": "Bearer valid-token"})
+    assert r.status_code == 503
+    assert r.json()["error"] == "model_unavailable"

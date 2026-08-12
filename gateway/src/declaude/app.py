@@ -99,7 +99,16 @@ def create_app(
     async def run_translation(text: str) -> str:
         if len(text) > settings.max_input_chars:
             raise HTTPException(422, f"text exceeds {settings.max_input_chars} characters")
-        return await model.complete(SYSTEM_PROMPT, text)
+        try:
+            return await model.complete(SYSTEM_PROMPT, text)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(
+                503,
+                {"error": "model_unavailable", "message": "model backend is unavailable or warming up; retry shortly"},
+                headers={"Retry-After": "30"},
+            ) from exc
 
     @app.get("/healthz")
     @app.get("/health")  # /healthz is intercepted by the Google Frontend on run.app URLs
