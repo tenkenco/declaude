@@ -17,6 +17,9 @@ class OpenAICompatClient(ModelClient):
         self._client = httpx.AsyncClient(timeout=timeout, headers={"Authorization": f"Bearer {api_key}"})
 
     async def complete(self, system: str, prompt: str) -> str:
+        # A translation is roughly input-length; 2x headroom bounds tail latency
+        # without ever truncating a reasonable rewrite. ~4 chars/token heuristic.
+        max_tokens = max(256, min(8192, len(prompt) // 2))
         r = await self._client.post(
             f"{self.base_url}/chat/completions",
             json={
@@ -26,6 +29,7 @@ class OpenAICompatClient(ModelClient):
                     {"role": "user", "content": prompt},
                 ],
                 "temperature": 0.3,
+                "max_tokens": max_tokens,
             },
         )
         r.raise_for_status()
