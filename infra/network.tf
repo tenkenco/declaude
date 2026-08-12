@@ -10,6 +10,38 @@ resource "google_compute_subnetwork" "main" {
   ip_cidr_range = "10.10.0.0/24"
 }
 
+# Model-tier subnet (may be a different region than the gateway).
+resource "google_compute_subnetwork" "model" {
+  name          = "declaude-model-subnet"
+  network       = google_compute_network.vpc.id
+  region        = var.model_region
+  ip_cidr_range = "10.10.2.0/24"
+}
+
+# Proxy-only subnet required by the internal L7 load balancer (model region).
+resource "google_compute_subnetwork" "model_proxy_only" {
+  name          = "declaude-model-proxy-only"
+  network       = google_compute_network.vpc.id
+  region        = var.model_region
+  ip_cidr_range = "10.10.3.0/24"
+  purpose       = "REGIONAL_MANAGED_PROXY"
+  role          = "ACTIVE"
+}
+
+resource "google_compute_router" "model_nat_router" {
+  name    = "declaude-model-nat-router"
+  network = google_compute_network.vpc.id
+  region  = var.model_region
+}
+
+resource "google_compute_router_nat" "model_nat" {
+  name                               = "declaude-model-nat"
+  router                             = google_compute_router.model_nat_router.name
+  region                             = var.model_region
+  nat_ip_allocate_option             = "AUTO_ONLY"
+  source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
+}
+
 # Proxy-only subnet required by the internal L7 load balancer.
 resource "google_compute_subnetwork" "proxy_only" {
   name          = "declaude-proxy-only"
@@ -43,7 +75,7 @@ resource "google_compute_firewall" "allow_lb_to_vllm" {
     ports    = ["8000"]
   }
   # proxy-only subnet + health checkers
-  source_ranges = ["10.10.1.0/24", "130.211.0.0/22", "35.191.0.0/16"]
+  source_ranges = ["10.10.1.0/24", "10.10.3.0/24", "130.211.0.0/22", "35.191.0.0/16"]
   target_tags   = ["vllm"]
 }
 

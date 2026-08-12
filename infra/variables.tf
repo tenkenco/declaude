@@ -13,10 +13,16 @@ variable "zone" {
   default = "us-central1-a"
 }
 
+variable "model_region" {
+  description = "Region for the model tier. May differ from the gateway region; the ILB uses global access."
+  type        = string
+  default     = "us-east1"
+}
+
 variable "model_zones" {
   description = "Zones the model MIG may use; spread wide since L4 capacity varies by zone."
   type        = list(string)
-  default     = ["us-central1-a", "us-central1-b", "us-central1-c"] # L4 stockouts flap zone-to-zone; ANY shape lets MIG chase capacity
+  default     = ["us-east1-b", "us-east1-c", "us-east1-d"] # us-central1 a/b/c were stocked out 2026-08-12; us-east1-b probed OK
 }
 
 variable "model_machine_type" {
