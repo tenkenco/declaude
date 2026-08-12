@@ -63,7 +63,7 @@ footer nav{display:flex;gap:1.5rem;flex-wrap:wrap}
   <h1>Turn Claude-English into plain English.</h1>
   <p class="sub">declaude is a translation API and MCP server that strips AI-assistant
   writing tics — em-dash pileups, hollow superlatives, "delve", "certainly!" — while
-  preserving meaning exactly. Backed by an open-source model (Qwen2.5-32B) on GCP.</p>
+  preserving meaning exactly. Backed by an open-source model (Qwen2.5-14B on dedicated GPUs) on GCP.</p>
   <div class="demo" role="figure" aria-label="Before and after example">
     <div class="before"><p class="label">Before</p>
       <p>Certainly! I'd be delighted to delve into this fascinating topic — it's a
