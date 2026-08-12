@@ -21,7 +21,7 @@ write_files:
       [Service]
       Restart=always
       RestartSec=10
-      ExecStartPre=/sbin/modprobe nvidia || true
+      ExecStartPre=-/sbin/modprobe nvidia
       ExecStart=/usr/bin/docker run --rm --name vllm \
         --device /dev/nvidia0:/dev/nvidia0 \
         --device /dev/nvidia-uvm:/dev/nvidia-uvm \
@@ -35,7 +35,8 @@ write_files:
         --served-model-name ${model_served_name} \
         --max-model-len ${max_model_len} \
         --tensor-parallel-size ${tensor_parallel} \
-        --gpu-memory-utilization 0.95
+        --gpu-memory-utilization 0.92 \
+        --enforce-eager
       ExecStop=/usr/bin/docker stop vllm
       StandardOutput=journal+console
 

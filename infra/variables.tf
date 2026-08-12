@@ -39,18 +39,18 @@ variable "model_accelerator" {
 variable "model_hf_id" {
   description = "HuggingFace model served by vLLM."
   type        = string
-  default     = "Qwen/Qwen2.5-32B-Instruct-AWQ"
+  default     = "Qwen/Qwen2.5-14B-Instruct-AWQ" # 32B-AWQ does not fit 8k ctx KV on 1xL4; upgrade to 32B with 2xL4 (g2-standard-24)
 }
 
 variable "model_served_name" {
   type    = string
-  default = "qwen2.5-32b-instruct"
+  default = "qwen2.5-14b-instruct"
 }
 
 variable "vllm_max_model_len" {
   description = "Context window. Bounded to fit 32B-AWQ KV cache on a single L4."
   type        = number
-  default     = 8192
+  default     = 16384
 }
 
 variable "model_replicas" {
