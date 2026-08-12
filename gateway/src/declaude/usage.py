@@ -45,3 +45,36 @@ class InMemoryUsageStore(UsageStore):
 
     def mark_paid_sync(self, user_id: str) -> None:
         self._paid.add(user_id)
+
+
+class FirestoreUsageStore(UsageStore):
+    """Firestore-backed store: `usage/{user_id}:{period}` counters, `users/{user_id}` paid flags.
+
+    Accepts a google.cloud.firestore.AsyncClient (or a duck-typed fake in tests)."""
+
+    def __init__(self, client):
+        self._db = client
+
+    def _usage_doc(self, user_id: str, period: str):
+        return self._db.collection("usage").document(f"{user_id}:{period}")
+
+    async def increment(self, user_id: str, period: str) -> int:
+        from google.cloud.firestore_v1.transforms import Increment
+
+        ref = self._usage_doc(user_id, period)
+        await ref.set({"count": Increment(1)}, merge=True)
+        snapshot = await ref.get()
+        return snapshot.get("count") or 0
+
+    async def get(self, user_id: str, period: str) -> int:
+        snapshot = await self._usage_doc(user_id, period).get()
+        if not snapshot.exists:
+            return 0
+        return snapshot.get("count") or 0
+
+    async def is_paid(self, user_id: str) -> bool:
+        snapshot = await self._db.collection("users").document(user_id).get()
+        return bool(snapshot.exists and snapshot.get("paid"))
+
+    async def set_paid(self, user_id: str, paid: bool) -> None:
+        await self._db.collection("users").document(user_id).set({"paid": paid}, merge=True)
