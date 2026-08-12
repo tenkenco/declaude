@@ -33,3 +33,10 @@ def test_healthz_is_public(client):
     r = client.get("/healthz")
     assert r.status_code == 200
     assert r.json()["status"] == "ok"
+
+
+def test_health_alias_is_public(client):
+    """GFE intercepts /healthz on run.app; /health must serve the same payload."""
+    r = client.get("/health")
+    assert r.status_code == 200
+    assert r.json()["status"] == "ok"
