@@ -44,8 +44,8 @@ def create_app(*, model: ModelClient, auth: Authenticator, usage: UsageStore, se
             raise HTTPException(401, "missing bearer token")
         try:
             return await auth.verify(header.removeprefix("Bearer "))
-        except Exception:
-            raise HTTPException(401, "invalid token")
+        except Exception as exc:
+            raise HTTPException(401, "invalid token") from exc
 
     UserId = Annotated[str, Depends(authenticate)]
 
