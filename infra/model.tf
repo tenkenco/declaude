@@ -24,8 +24,12 @@ resource "google_compute_instance_template" "vllm" {
   }
 
   scheduling {
-    on_host_maintenance = "TERMINATE"
-    automatic_restart   = true
+    # Spot: ~65% cheaper than on-demand. Preemptions are absorbed by MIG
+    # auto-healing + the gateway's 503/Retry-After degradation (~15 min re-warm).
+    preemptible                 = true
+    provisioning_model          = "SPOT"
+    on_host_maintenance         = "TERMINATE"
+    automatic_restart           = false # required for spot
   }
 
   network_interface {
