@@ -103,7 +103,7 @@ def create_app(
             return await model.complete(SYSTEM_PROMPT, text)
         except HTTPException:
             raise
-        except Exception as exc:  # noqa: BLE001 — backend failures must not leak as 500s
+        except Exception as exc:
             raise HTTPException(
                 503,
                 {"error": "model_unavailable", "message": "model backend is unavailable or warming up; retry shortly"},
