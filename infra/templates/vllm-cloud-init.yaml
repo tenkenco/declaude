@@ -1,0 +1,46 @@
+#cloud-config
+
+write_files:
+  - path: /etc/systemd/system/install-gpu.service
+    content: |
+      [Unit]
+      Description=Install GPU drivers
+      After=network-online.target
+      Wants=network-online.target
+      [Service]
+      Type=oneshot
+      RemainAfterExit=true
+      ExecStart=/usr/bin/cos-extensions install gpu
+      StandardOutput=journal+console
+  - path: /etc/systemd/system/vllm.service
+    content: |
+      [Unit]
+      Description=vLLM OpenAI-compatible server
+      Requires=install-gpu.service
+      After=install-gpu.service
+      [Service]
+      Restart=always
+      RestartSec=10
+      ExecStartPre=/sbin/modprobe nvidia || true
+      ExecStart=/usr/bin/docker run --rm --name vllm \
+        --device /dev/nvidia0:/dev/nvidia0 \
+        --device /dev/nvidia-uvm:/dev/nvidia-uvm \
+        --device /dev/nvidiactl:/dev/nvidiactl \
+        --volume /var/lib/nvidia/lib64:/usr/local/nvidia/lib64 \
+        --volume /var/lib/nvidia/bin:/usr/local/nvidia/bin \
+        --volume /var/lib/vllm-cache:/root/.cache \
+        -p 8000:8000 --shm-size=8g \
+        vllm/vllm-openai:v0.8.5 \
+        --model ${model_hf_id} \
+        --served-model-name ${model_served_name} \
+        --max-model-len ${max_model_len} \
+        --tensor-parallel-size ${tensor_parallel} \
+        --gpu-memory-utilization 0.95
+      ExecStop=/usr/bin/docker stop vllm
+      StandardOutput=journal+console
+
+runcmd:
+  - mkdir -p /var/lib/vllm-cache
+  - systemctl daemon-reload
+  - systemctl start install-gpu.service
+  - systemctl start vllm.service
