@@ -41,11 +41,14 @@ WebhookVerifier = Callable[[bytes, str], dict]
 
 def default_webhook_verifier(payload: bytes, sig_header: str) -> dict:
     """Verify a Stripe webhook signature using STRIPE_WEBHOOK_SECRET from the environment."""
+    import json
     import os
 
     import stripe
 
-    return stripe.Webhook.construct_event(payload, sig_header, os.environ["STRIPE_WEBHOOK_SECRET"])
+    event = stripe.Webhook.construct_event(payload, sig_header, os.environ["STRIPE_WEBHOOK_SECRET"])
+    # StripeObject attribute access is unreliable across versions; normalize to plain JSON types.
+    return json.loads(json.dumps(event, default=lambda o: dict(o)))
 
 
 def create_app(
