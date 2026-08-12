@@ -57,7 +57,7 @@ resource "google_cloud_run_v2_service" "gateway" {
     }
 
     scaling {
-      min_instance_count = 0
+      min_instance_count = 1 # always-warm: no cold starts for first user
       max_instance_count = 10
     }
 
