@@ -2,14 +2,16 @@
 
 DECLAUDE_AUTH_MODE=clerk (default) verifies Clerk JWTs via JWKS.
 DECLAUDE_AUTH_MODE=dev accepts the static token in DECLAUDE_DEV_TOKEN (local dogfooding only).
+DECLAUDE_USAGE_BACKEND=firestore|memory (default memory) selects the usage store.
+STRIPE_WEBHOOK_SECRET enables Stripe webhook signature verification.
 """
 import os
 
-from .app import create_app
+from .app import create_app, default_webhook_verifier
 from .auth import Authenticator, ClerkAuthenticator
 from .config import Settings
 from .model import OpenAICompatClient
-from .usage import InMemoryUsageStore
+from .usage import FirestoreUsageStore, InMemoryUsageStore, UsageStore
 
 
 class DevAuthenticator(Authenticator):
@@ -24,6 +26,14 @@ class DevAuthenticator(Authenticator):
         return "dev_user"
 
 
+def build_usage_store() -> UsageStore:
+    if os.environ.get("DECLAUDE_USAGE_BACKEND", "memory") == "firestore":
+        from google.cloud import firestore
+
+        return FirestoreUsageStore(firestore.AsyncClient(project=os.environ.get("GOOGLE_CLOUD_PROJECT")))
+    return InMemoryUsageStore()
+
+
 def build_app():
     settings = Settings.from_env()
     if os.environ.get("DECLAUDE_AUTH_MODE", "clerk") == "dev":
@@ -34,7 +44,13 @@ def build_app():
             authorized_parties=[p for p in os.environ.get("CLERK_AUTHORIZED_PARTIES", "").split(",") if p],
         )
     model = OpenAICompatClient(base_url=settings.model_base_url, model=settings.model_name)
-    return create_app(model=model, auth=auth, usage=InMemoryUsageStore(), settings=settings)
+    return create_app(
+        model=model,
+        auth=auth,
+        usage=build_usage_store(),
+        settings=settings,
+        webhook_verifier=default_webhook_verifier,
+    )
 
 
 app = build_app()

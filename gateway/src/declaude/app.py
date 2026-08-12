@@ -1,4 +1,5 @@
 """FastAPI application factory. All external dependencies are injected."""
+from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -35,8 +36,28 @@ class TranslateRequest(BaseModel):
         return v
 
 
-def create_app(*, model: ModelClient, auth: Authenticator, usage: UsageStore, settings: Settings) -> FastAPI:
+WebhookVerifier = Callable[[bytes, str], dict]
+
+
+def default_webhook_verifier(payload: bytes, sig_header: str) -> dict:
+    """Verify a Stripe webhook signature using STRIPE_WEBHOOK_SECRET from the environment."""
+    import os
+
+    import stripe
+
+    return stripe.Webhook.construct_event(payload, sig_header, os.environ["STRIPE_WEBHOOK_SECRET"])
+
+
+def create_app(
+    *,
+    model: ModelClient,
+    auth: Authenticator,
+    usage: UsageStore,
+    settings: Settings,
+    webhook_verifier: WebhookVerifier | None = None,
+) -> FastAPI:
     app = FastAPI(title="declaude", version="0.1.0")
+    verify_webhook = webhook_verifier or default_webhook_verifier
 
     async def authenticate(request: Request) -> str:
         header = request.headers.get("Authorization", "")
@@ -91,6 +112,29 @@ def create_app(*, model: ModelClient, auth: Authenticator, usage: UsageStore, se
         await meter(user_id, response)
         translation = await run_translation(body.text)
         return {"translation": translation, "model": settings.model_name}
+
+    # ---- Stripe billing webhook (public: Stripe signature is the auth) ----
+
+    def _webhook_user_id(obj: dict) -> str | None:
+        return (obj.get("metadata") or {}).get("clerk_user_id") or obj.get("client_reference_id")
+
+    @app.post("/v1/billing/webhook")
+    async def billing_webhook(request: Request):
+        payload = await request.body()
+        sig_header = request.headers.get("Stripe-Signature", "")
+        try:
+            event = verify_webhook(payload, sig_header)
+        except Exception as exc:
+            raise HTTPException(400, "invalid webhook signature") from exc
+
+        event_type = event.get("type")
+        obj = (event.get("data") or {}).get("object") or {}
+        user_id = _webhook_user_id(obj)
+        if event_type == "checkout.session.completed" and user_id:
+            await usage.set_paid(user_id, True)
+        elif event_type == "customer.subscription.deleted" and user_id:
+            await usage.set_paid(user_id, False)
+        return {"received": True}
 
     # ---- MCP (JSON-RPC 2.0 over HTTP) ----
 
