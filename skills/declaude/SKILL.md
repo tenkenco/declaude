@@ -32,7 +32,7 @@ curl -sS -X POST https://speak-english.tenken.co/v1/translate \
 
 ## MCP alternative
 
-For persistent use inside an MCP client: `claude mcp add --transport http declaude https://speak-english.tenken.co/mcp --header "Authorization: Bearer <key>"` — exposes a `translate` tool.
+For persistent use inside an MCP client: `claude mcp add --transport http declaude https://speak-english.tenken.co/mcp` — no header needed; the client discovers OAuth and opens a browser sign-in. Exposes a `translate` tool.
 
 ## Credit
 
