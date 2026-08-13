@@ -124,6 +124,10 @@ footer nav{display:flex;gap:1.5rem;flex-wrap:wrap}
     <a href="#api">API</a>
     <a href="#pricing">Pricing</a>
   </nav>
+  <p class="hint" style="margin-top:.9rem">Based on
+  <a href="https://github.com/gvzdv/claudish-to-english" rel="noopener">claudish-to-english</a>
+  by <a href="https://github.com/gvzdv" rel="noopener">gvzdv</a> — the original local-Ollama
+  hook this service grew out of.</p>
 </footer>
 </main>
 </body>
