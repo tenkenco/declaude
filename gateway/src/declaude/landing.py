@@ -79,11 +79,10 @@ footer nav{display:flex;gap:1.5rem;flex-wrap:wrap}
   <h2>Quickstart: MCP</h2>
   <p class="lead">Add declaude to any MCP client over HTTP. The tool <code>translate</code> is exposed at <code>/mcp</code>.</p>
   <pre><code>claude mcp add --transport http declaude \\
-  https://speak-english.tenken.co/mcp \\
-  --header "Authorization: Bearer &lt;your api key&gt;"</code></pre>
-  <p class="hint">Authenticate with an API key in the
-  <code>Authorization: Bearer</code> header.
-  <a href="/signin">Sign in to get a key</a> — it does not expire.</p>
+  https://speak-english.tenken.co/mcp</code></pre>
+  <p class="hint">No key needed — your MCP client opens a browser sign-in (OAuth).
+  Prefer a key? <a href="/signin">Mint one</a> and pass it as a
+  <code>Authorization: Bearer</code> header.</p>
 </section>
 
 <section id="api">

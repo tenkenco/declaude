@@ -22,9 +22,8 @@ curl -X POST https://speak-english.tenken.co/v1/translate \
 ```
 
 ```bash
-# MCP (Claude Code, Cursor, any MCP client)
-claude mcp add --transport http declaude https://speak-english.tenken.co/mcp \
-  --header "Authorization: Bearer $DECLAUDE_TOKEN"
+# MCP (Claude Code, Cursor, any MCP client) — sign-in happens in the browser via OAuth
+claude mcp add --transport http declaude https://speak-english.tenken.co/mcp
 ```
 
 ```bash
