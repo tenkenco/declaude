@@ -1,4 +1,8 @@
-"""Authorize page for the OAuth flow: Clerk sign-in, then approve -> redirect with code."""
+"""Authorize page: Clerk sign-in that returns HERE, then auto-approves and redirects.
+
+The person already chose to connect this app in their MCP client; signing in IS the
+consent. No raw client IDs, no extra clicks, no detour to Clerk's hosted portal.
+"""
 
 PAGE = """<!doctype html>
 <html lang="en">
@@ -14,17 +18,19 @@ h1{{font-size:1.6rem;letter-spacing:-.02em;margin-bottom:.5rem}}
 .card{{background:#11151f;border:1px solid #1f2634;border-radius:12px;padding:1.4rem;margin-top:1.25rem}}
 button{{background:#f97316;color:#0b0e14;border:0;border-radius:8px;padding:.65rem 1.1rem;font:inherit;font-weight:600;cursor:pointer}}
 .err{{color:#f87171}}
+.spin{{display:inline-block;width:1em;height:1em;border:2px solid #9aa4b2;border-top-color:#f97316;border-radius:50%;animation:r 1s linear infinite;vertical-align:-.15em;margin-right:.5em}}
+@keyframes r{{to{{transform:rotate(360deg)}}}}
 [hidden]{{display:none !important}}
 </style></head>
 <body><main>
 <p class="logo">de<b>claude</b></p>
-<h1>Authorize this application</h1>
-<p class="sub"><b>{client_id}</b> wants to translate text with your declaude account.</p>
+<h1>Connect {client_name}</h1>
+<p class="sub">Sign in to let <b>{client_name}</b> translate text with your declaude account.</p>
 <div id="clerk"></div>
-<section id="approve-card" class="card" hidden>
-  <p>Signed in as <b id="who"></b>.</p>
-  <p style="margin-top:.75rem"><button id="approve">Approve and continue</button></p>
+<section id="done-card" class="card" hidden>
+  <p id="status"><span class="spin"></span>Signed in as <b id="who"></b> — returning you to {client_name}&hellip;</p>
   <p id="error" class="err" hidden></p>
+  <p id="retry-row" hidden style="margin-top:.75rem"><button id="retry">Try again</button></p>
 </section>
 <script src="{clerk_js}" data-clerk-publishable-key="{pk}" crossorigin="anonymous" async onload="start()"></script>
 <script>
@@ -32,21 +38,26 @@ const q = new URLSearchParams(location.search);
 let clerk;
 async function start() {{
   clerk = window.Clerk;
-  await clerk.load({{appearance:{{variables:{{colorBackground:"#11151f",colorText:"#e6e9ef",colorPrimary:"#f97316",colorInputBackground:"#0d1117",colorInputText:"#e6e9ef"}}}}}});
-  render();
+  await clerk.load({{appearance:{{variables:{{
+    colorBackground:"#11151f",colorInputBackground:"#0d1117",colorText:"#e6e9ef",
+    colorTextSecondary:"#9aa4b2",colorInputText:"#e6e9ef",colorPrimary:"#f97316",
+    colorNeutral:"#e6e9ef",borderRadius:"8px"}}}}}});
+  if (clerk.user) {{ autoApprove(); return; }}
+  // Pin every sign-in path (email code, GitHub, Google) back to THIS page, params intact.
+  clerk.mountSignIn(document.getElementById("clerk"), {{
+    routing: "virtual",
+    forceRedirectUrl: location.href,
+    fallbackRedirectUrl: location.href,
+  }});
+  clerk.addListener(({{user}}) => {{ if (user) autoApprove(); }});
 }}
-function render() {{
-  if (clerk.user) {{
-    document.getElementById("who").textContent = clerk.user.primaryEmailAddress?.emailAddress || clerk.user.id;
-    document.getElementById("approve-card").hidden = false;
-    document.getElementById("clerk").innerHTML = "";
-  }} else {{
-    clerk.mountSignIn(document.getElementById("clerk"));
-  }}
-}}
-document.addEventListener("click", async (e) => {{
-  if (e.target.id !== "approve") return;
-  e.target.disabled = true;
+let approving = false;
+async function autoApprove() {{
+  if (approving) return; approving = true;
+  document.getElementById("clerk").innerHTML = "";
+  document.getElementById("who").textContent =
+    clerk.user.primaryEmailAddress?.emailAddress || "your account";
+  document.getElementById("done-card").hidden = false;
   try {{
     const token = await clerk.session.getToken();
     const res = await fetch("/oauth/approve", {{
@@ -60,15 +71,18 @@ document.addEventListener("click", async (e) => {{
     if (!res.ok) throw new Error("server returned " + res.status);
     location.href = (await res.json()).redirect_to;
   }} catch (err) {{
+    approving = false;
     const el = document.getElementById("error");
-    el.textContent = "Authorization failed: " + err.message; el.hidden = false;
-    e.target.disabled = false;
+    el.textContent = "Could not finish authorization: " + err.message; el.hidden = false;
+    document.getElementById("retry-row").hidden = false;
   }}
-}});
+}}
+document.addEventListener("click", (e) => {{ if (e.target.id === "retry") autoApprove(); }});
 </script>
 </main></body></html>
 """
 
 
-def authorize_html(publishable_key: str, clerk_js_url: str, client_id: str) -> str:
-    return PAGE.format(pk=publishable_key, clerk_js=clerk_js_url, client_id=client_id or "An application")
+def authorize_html(publishable_key: str, clerk_js_url: str, client_name: str) -> str:
+    return PAGE.format(pk=publishable_key, clerk_js=clerk_js_url,
+                       client_name=client_name or "this application")

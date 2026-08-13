@@ -163,3 +163,32 @@ def test_approve_requires_valid_session(client):
         "state": "s", "code_challenge": "c", "code_challenge_method": "S256",
     })
     assert r.status_code == 401
+
+
+# --- UX: friendly client names, sticky redirect, auto-approve ---
+
+def test_registered_client_name_shown_on_authorize(client):
+    reg = client.post("/oauth/register", json={"client_name": "Claude Code", "redirect_uris": ["http://localhost:1/cb"]}).json()
+    r = client.get("/oauth/authorize", params={
+        "client_id": reg["client_id"], "redirect_uri": "http://localhost:1/cb", "response_type": "code",
+        "state": "s", "code_challenge": "c", "code_challenge_method": "S256",
+    })
+    assert "Claude Code" in r.text
+    assert reg["client_id"] not in r.text  # raw IDs are not for humans
+
+
+def test_unknown_client_gets_generic_name(client):
+    r = client.get("/oauth/authorize", params={
+        "client_id": "cli_never_registered", "redirect_uri": "http://localhost:1/cb", "response_type": "code",
+        "state": "s", "code_challenge": "c", "code_challenge_method": "S256",
+    })
+    assert "cli_never_registered" not in r.text
+
+
+def test_authorize_page_pins_redirect_and_autoapproves(client):
+    r = client.get("/oauth/authorize", params={
+        "client_id": "c", "redirect_uri": "http://localhost:1/cb", "response_type": "code",
+        "state": "s", "code_challenge": "c", "code_challenge_method": "S256",
+    })
+    assert "forceRedirectUrl" in r.text   # sign-in must return to this exact page
+    assert "autoApprove" in r.text        # signed-in return completes without extra clicks
