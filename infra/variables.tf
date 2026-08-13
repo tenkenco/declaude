@@ -60,7 +60,7 @@ variable "model_replicas" {
 
 variable "clerk_jwks_url" {
   type    = string
-  default = "https://humble-arachnid-95.clerk.accounts.dev/.well-known/jwks.json"
+  default = "https://clerk.tenken.co/.well-known/jwks.json"
 }
 
 variable "free_tier_monthly_limit" {
