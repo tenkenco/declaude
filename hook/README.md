@@ -18,6 +18,6 @@ if the service or your quota is unavailable, your session is never blocked.
 ## MCP alternative
 
 ```
-claude mcp add --transport http declaude https://declaude-gateway-477468296053.us-central1.run.app/mcp \
+claude mcp add --transport http declaude https://speak-english.tenken.co/mcp \
   --header "Authorization: Bearer $DECLAUDE_TOKEN"
 ```
