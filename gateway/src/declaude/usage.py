@@ -26,6 +26,10 @@ class UsageStore(ABC):
     async def put_oauth_code(self, code_hash: str, data: dict) -> None: ...
     @abstractmethod
     async def pop_oauth_code(self, code_hash: str) -> dict | None: ...
+    @abstractmethod
+    async def put_oauth_client(self, client_id: str, name: str) -> None: ...
+    @abstractmethod
+    async def get_oauth_client(self, client_id: str) -> str | None: ...
 
 
 class InMemoryUsageStore(UsageStore):
@@ -71,6 +75,13 @@ class InMemoryUsageStore(UsageStore):
     async def pop_oauth_code(self, code_hash: str) -> dict | None:
         self._codes = getattr(self, "_codes", {})
         return self._codes.pop(code_hash, None)
+
+    async def put_oauth_client(self, client_id: str, name: str) -> None:
+        self._clients = getattr(self, "_clients", {})
+        self._clients[client_id] = name
+
+    async def get_oauth_client(self, client_id: str) -> str | None:
+        return getattr(self, "_clients", {}).get(client_id)
 
 
 class FirestoreUsageStore(UsageStore):
@@ -124,3 +135,10 @@ class FirestoreUsageStore(UsageStore):
             return None
         await ref.delete()  # single-use; PKCE binding is the hard security boundary
         return snapshot.to_dict()
+
+    async def put_oauth_client(self, client_id: str, name: str) -> None:
+        await self._db.collection("oauth_clients").document(client_id).set({"name": name})
+
+    async def get_oauth_client(self, client_id: str) -> str | None:
+        snap = await self._db.collection("oauth_clients").document(client_id).get()
+        return snap.to_dict().get("name") if snap.exists else None

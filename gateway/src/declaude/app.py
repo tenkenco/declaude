@@ -273,9 +273,13 @@ def create_app(
             body = await request.json()
         except ValueError:
             pass
+        client_id = "cli_" + new_code()[:24]
+        name = str(body.get("client_name") or "")[:80]
+        if name:
+            await usage.put_oauth_client(client_id, name)
         return {
-            "client_id": "cli_" + new_code()[:24],
-            "client_name": body.get("client_name", ""),
+            "client_id": client_id,
+            "client_name": name,
             "redirect_uris": body.get("redirect_uris", []),
             "token_endpoint_auth_method": "none",
             "grant_types": ["authorization_code"],
@@ -290,7 +294,8 @@ def create_app(
         if not p.get("redirect_uri"):
             raise HTTPException(400, "redirect_uri required")
         pk = settings.clerk_publishable_key
-        return HTMLResponse(authorize_html(pk, clerk_js_for(pk), p.get("client_id", "")))
+        name = await usage.get_oauth_client(p.get("client_id", ""))
+        return HTMLResponse(authorize_html(pk, clerk_js_for(pk), name or ""))
 
     @app.post("/oauth/approve")
     async def oauth_approve(request: Request):
