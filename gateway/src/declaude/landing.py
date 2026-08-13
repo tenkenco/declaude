@@ -79,7 +79,7 @@ footer nav{display:flex;gap:1.5rem;flex-wrap:wrap}
   <h2>Quickstart: MCP</h2>
   <p class="lead">Add declaude to any MCP client over HTTP. The tool <code>translate</code> is exposed at <code>/mcp</code>.</p>
   <pre><code>claude mcp add --transport http declaude \\
-  https://declaude-gateway-477468296053.us-central1.run.app/mcp \\
+  https://speak-english.tenken.co/mcp \\
   --header "Authorization: Bearer &lt;your api key&gt;"</code></pre>
   <p class="hint">Authenticate with an API key in the
   <code>Authorization: Bearer</code> header.
@@ -89,7 +89,7 @@ footer nav{display:flex;gap:1.5rem;flex-wrap:wrap}
 <section id="api">
   <h2>Quickstart: REST API</h2>
   <p class="lead">One endpoint: <code>POST /v1/translate</code>. Send text, get plain English back.</p>
-  <pre><code>curl -X POST https://declaude-gateway-477468296053.us-central1.run.app/v1/translate \\
+  <pre><code>curl -X POST https://speak-english.tenken.co/v1/translate \\
   -H "Authorization: Bearer &lt;your api key&gt;" \\
   -H "Content-Type: application/json" \\
   -d '{"text": "Certainly! Let me delve into that."}'

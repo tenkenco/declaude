@@ -17,7 +17,7 @@ import sys
 import urllib.error
 import urllib.request
 
-DEFAULT_URL = "https://declaude-gateway-477468296053.us-central1.run.app"
+DEFAULT_URL = "https://speak-english.tenken.co"
 
 
 def translate(text: str, *, token: str, base_url: str = DEFAULT_URL, timeout: int = 120) -> str:
