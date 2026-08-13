@@ -33,3 +33,9 @@ curl -sS -X POST https://speak-english.tenken.co/v1/translate \
 ## MCP alternative
 
 For persistent use inside an MCP client: `claude mcp add --transport http declaude https://speak-english.tenken.co/mcp --header "Authorization: Bearer <key>"` — exposes a `translate` tool.
+
+## Credit
+
+The rewriting approach and prompt are adapted from
+[gvzdv/claudish-to-english](https://github.com/gvzdv/claudish-to-english), the original
+local-Ollama Claude Code hook. declaude is its hosted, multi-user descendant.
