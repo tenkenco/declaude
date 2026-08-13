@@ -22,6 +22,10 @@ class UsageStore(ABC):
     async def get_user_for_key(self, key_hash: str) -> str | None: ...
     @abstractmethod
     async def add_api_key(self, key_hash: str, user_id: str) -> None: ...
+    @abstractmethod
+    async def put_oauth_code(self, code_hash: str, data: dict) -> None: ...
+    @abstractmethod
+    async def pop_oauth_code(self, code_hash: str) -> dict | None: ...
 
 
 class InMemoryUsageStore(UsageStore):
@@ -59,6 +63,14 @@ class InMemoryUsageStore(UsageStore):
 
     async def add_api_key(self, key_hash: str, user_id: str) -> None:
         self._keys[key_hash] = user_id
+
+    async def put_oauth_code(self, code_hash: str, data: dict) -> None:
+        self._codes = getattr(self, "_codes", {})
+        self._codes[code_hash] = data
+
+    async def pop_oauth_code(self, code_hash: str) -> dict | None:
+        self._codes = getattr(self, "_codes", {})
+        return self._codes.pop(code_hash, None)
 
 
 class FirestoreUsageStore(UsageStore):
@@ -101,3 +113,14 @@ class FirestoreUsageStore(UsageStore):
 
     async def add_api_key(self, key_hash: str, user_id: str) -> None:
         await self._db.collection("apikeys").document(key_hash).set({"user_id": user_id})
+
+    async def put_oauth_code(self, code_hash: str, data: dict) -> None:
+        await self._db.collection("oauth_codes").document(code_hash).set(data)
+
+    async def pop_oauth_code(self, code_hash: str) -> dict | None:
+        ref = self._db.collection("oauth_codes").document(code_hash)
+        snapshot = await ref.get()
+        if not snapshot.exists:
+            return None
+        await ref.delete()  # single-use; PKCE binding is the hard security boundary
+        return snapshot.to_dict()

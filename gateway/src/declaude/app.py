@@ -1,7 +1,9 @@
 """FastAPI application factory. All external dependencies are injected."""
 import base64
+import time
 from collections.abc import Callable
 from typing import Annotated
+from urllib.parse import parse_qs
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import (
@@ -18,9 +20,19 @@ from .config import Settings
 from .keys import generate_key, hash_key
 from .landing import LANDING_HTML
 from .model import ModelClient
+from .oauth import (
+    CODE_TTL_SECONDS,
+    AuthCode,
+    hash_code,
+    new_code,
+    resource_metadata,
+    server_metadata,
+    verify_pkce,
+)
+from .oauth_page import authorize_html
 from .prompts import SYSTEM_PROMPT
 from .seo import head_tags, json_ld, robots_txt, sitemap_xml
-from .signin import signin_html
+from .signin import clerk_js_for, signin_html
 from .usage import UsageStore, current_period
 
 PROTOCOL_VERSION = "2025-03-26"
@@ -89,14 +101,14 @@ def create_app(
                 raise HTTPException(401, "malformed basic auth") from exc
             return await _resolve_api_key(key)
         if not header.startswith("Bearer "):
-            raise HTTPException(401, "missing bearer token")
+            raise HTTPException(401, "missing bearer token", headers=_www_auth(request))
         token = header.removeprefix("Bearer ")
         if token.startswith("dk_"):
             return await _resolve_api_key(token)
         try:
             return await auth.verify(token)
         except Exception as exc:
-            raise HTTPException(401, "invalid token") from exc
+            raise HTTPException(401, "invalid token", headers=_www_auth(request)) from exc
 
     UserId = Annotated[str, Depends(authenticate)]
 
@@ -236,6 +248,92 @@ def create_app(
         elif event_type == "customer.subscription.deleted" and user_id:
             await usage.set_paid(user_id, False)
         return {"received": True}
+
+    def _www_auth(request: Request) -> dict[str, str] | None:
+        if request.url.path != "/mcp":
+            return None
+        meta = settings.public_base_url.rstrip("/") + "/.well-known/oauth-protected-resource"
+        return {"WWW-Authenticate": f'Bearer resource_metadata="{meta}"'}
+
+    # ---- OAuth 2.1 (MCP clients: discovery, DCR, PKCE) ----
+
+    @app.get("/.well-known/oauth-protected-resource", include_in_schema=False)
+    async def oauth_resource():
+        return resource_metadata(settings.public_base_url)
+
+    @app.get("/.well-known/oauth-authorization-server", include_in_schema=False)
+    async def oauth_server():
+        return server_metadata(settings.public_base_url)
+
+    @app.post("/oauth/register", status_code=201)
+    async def oauth_register(request: Request):
+        """RFC 7591 dynamic registration. Public clients only; PKCE carries the security."""
+        body = {}
+        try:
+            body = await request.json()
+        except ValueError:
+            pass
+        return {
+            "client_id": "cli_" + new_code()[:24],
+            "client_name": body.get("client_name", ""),
+            "redirect_uris": body.get("redirect_uris", []),
+            "token_endpoint_auth_method": "none",
+            "grant_types": ["authorization_code"],
+            "response_types": ["code"],
+        }
+
+    @app.get("/oauth/authorize", include_in_schema=False)
+    async def oauth_authorize(request: Request):
+        p = request.query_params
+        if p.get("code_challenge_method", "S256") != "S256" or not p.get("code_challenge"):
+            raise HTTPException(400, "PKCE S256 required")
+        if not p.get("redirect_uri"):
+            raise HTTPException(400, "redirect_uri required")
+        pk = settings.clerk_publishable_key
+        return HTMLResponse(authorize_html(pk, clerk_js_for(pk), p.get("client_id", "")))
+
+    @app.post("/oauth/approve")
+    async def oauth_approve(request: Request):
+        """The signed-in browser exchanges its Clerk session for an authorization code."""
+        body = await request.json()
+        try:
+            user_id = await auth.verify(body.get("token", ""))
+        except Exception as exc:
+            raise HTTPException(401, "invalid session") from exc
+        if body.get("code_challenge_method") != "S256" or not body.get("code_challenge"):
+            raise HTTPException(400, "PKCE S256 required")
+        redirect_uri = body.get("redirect_uri") or ""
+        code = new_code()
+        grant = AuthCode(
+            user_id=user_id,
+            redirect_uri=redirect_uri,
+            code_challenge=body["code_challenge"],
+            expires_at=time.time() + CODE_TTL_SECONDS,
+        )
+        await usage.put_oauth_code(hash_code(code), grant.__dict__)
+        sep = "&" if "?" in redirect_uri else "?"
+        state = body.get("state") or ""
+        return {"redirect_to": f"{redirect_uri}{sep}code={code}&state={state}"}
+
+    @app.post("/oauth/token")
+    async def oauth_token(request: Request):
+        form = parse_qs((await request.body()).decode())
+        get = lambda k: (form.get(k) or [""])[0]
+        if get("grant_type") != "authorization_code":
+            raise HTTPException(400, "unsupported grant_type")
+        data = await usage.pop_oauth_code(hash_code(get("code")))
+        if data is None:
+            raise HTTPException(400, "invalid or already-used code")
+        grant = AuthCode(**data)
+        if grant.expired():
+            raise HTTPException(400, "code expired")
+        if get("redirect_uri") != grant.redirect_uri:
+            raise HTTPException(400, "redirect_uri mismatch")
+        if not verify_pkce(get("code_verifier"), grant.code_challenge):
+            raise HTTPException(400, "PKCE verification failed")
+        key = generate_key()
+        await usage.add_api_key(hash_key(key), grant.user_id)
+        return {"access_token": key, "token_type": "Bearer", "scope": "translate"}
 
     # ---- Ollama-compatible surface (claudish-to-english plugin & friends) ----
 
