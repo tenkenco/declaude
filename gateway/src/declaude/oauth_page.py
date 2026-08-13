@@ -11,7 +11,11 @@ PAGE = """<!doctype html>
 <title>declaude — authorize</title>
 <style>
 body{{background:#0b0e14;color:#e6e9ef;font:16px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}}
-main{{max-width:560px;margin:0 auto;padding:3.5rem 1.25rem}}
+main{{max-width:560px;margin:0 auto;padding:3.5rem 1.25rem;
+  display:flex;flex-direction:column;align-items:center;text-align:center}}
+main>*{{width:100%}}
+#clerk>div{{display:flex;justify-content:center}}
+.card{{text-align:left}}
 .logo{{font-size:1.05rem;font-weight:600;color:#9aa4b2;margin-bottom:2rem}}.logo b{{color:#f97316}}
 h1{{font-size:1.6rem;letter-spacing:-.02em;margin-bottom:.5rem}}
 .sub{{color:#9aa4b2;margin-bottom:2rem}}

@@ -28,7 +28,11 @@ body{{background:var(--bg);color:var(--text);
   font:16px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   -webkit-font-smoothing:antialiased}}
 code,pre{{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}}
-main{{max-width:640px;margin:0 auto;padding:3.5rem 1.25rem 4rem}}
+main{{max-width:640px;margin:0 auto;padding:3.5rem 1.25rem 4rem;
+  display:flex;flex-direction:column;align-items:center;text-align:center}}
+main>*{{width:100%}}
+#clerk>div{{display:flex;justify-content:center}}
+.card{{text-align:left}}
 a{{color:var(--accent-soft)}}
 .logo{{font-size:1.05rem;font-weight:600;color:var(--muted);margin-bottom:2rem}}
 .logo b{{color:var(--accent)}}
@@ -53,8 +57,8 @@ pre{{background:var(--code-bg);border:1px solid var(--border);border-radius:10px
 <main>
   <p class="logo">de<b>claude</b></p>
   <h1>Get your API key</h1>
-  <p class="sub">Sign in once. Your key does not expire, so it works in a Claude Code hook,
-  an MCP client, or a shell profile.</p>
+  <p class="sub">Sign in with GitHub, Google, or an email code. Your key does not expire —
+  use it in a Claude Code hook, an MCP client, or a shell profile.</p>
 
   <div id="clerk"></div>
 
@@ -79,6 +83,8 @@ pre{{background:var(--code-bg);border:1px solid var(--border);border-radius:10px
     <p class="hint" style="margin-top:1rem">Use it in the Claude Code hook:</p>
     <pre id="cmd"></pre>
   </section>
+  <p class="hint" style="margin-top:2rem"><a href="/">&larr; speak-english.tenken.co</a>
+  &nbsp;&middot;&nbsp; 100 free translations/month &nbsp;&middot;&nbsp; $5/mo unlimited</p>
 </main>
 
 <script src="{clerk_js}" data-clerk-publishable-key="{pk}" crossorigin="anonymous" async
