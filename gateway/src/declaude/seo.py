@@ -4,6 +4,7 @@ import json
 
 def head_tags(base_url: str, ga_id: str, *, title: str, description: str, path: str = "/") -> str:
     canonical = base_url.rstrip("/") + path
+    img = base_url.rstrip("/") + "/og.png"
     og = f"""
 <link rel="canonical" href="{canonical}">
 <meta property="og:type" content="website">
@@ -11,9 +12,13 @@ def head_tags(base_url: str, ga_id: str, *, title: str, description: str, path: 
 <meta property="og:title" content="{title}">
 <meta property="og:description" content="{description}">
 <meta property="og:site_name" content="declaude">
-<meta name="twitter:card" content="summary">
+<meta property="og:image" content="{img}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{title}">
-<meta name="twitter:description" content="{description}">"""
+<meta name="twitter:description" content="{description}">
+<meta name="twitter:image" content="{img}">"""
     ga = ""
     if ga_id:
         ga = f"""

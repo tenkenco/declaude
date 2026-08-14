@@ -96,3 +96,16 @@ def test_402_payload_contains_upgrade_url(bare_client, usage, settings):
     r = bare_client.post("/v1/translate", json={"text": "hi"}, headers=h)
     assert r.status_code == 402
     assert r.json()["upgrade_url"].endswith("/upgrade")
+
+
+def test_og_image_served(client):
+    r = client.get("/og.png")
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "image/png"
+    assert r.content[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_head_tags_carry_og_image(client):
+    html = client.get("/").text
+    assert 'property="og:image" content="https://speak-english.tenken.co/og.png"' in html
+    assert 'name="twitter:card" content="summary_large_image"' in html

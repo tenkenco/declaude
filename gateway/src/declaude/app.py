@@ -182,6 +182,14 @@ def create_app(
             path="/",
         ))
 
+    @app.get("/og.png", include_in_schema=False)
+    async def og_image():
+        from importlib import resources
+
+        data = (resources.files("declaude") / "og.png").read_bytes()
+        return Response(data, media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
     @app.get("/robots.txt", include_in_schema=False)
     async def robots() -> PlainTextResponse:
         return PlainTextResponse(robots_txt(settings.public_base_url))
