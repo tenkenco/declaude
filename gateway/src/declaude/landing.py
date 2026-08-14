@@ -105,9 +105,9 @@ footer a{color:var(--muted)}
 
   <div class="demo" id="try">
     <div class="before"><p class="label">Before</p>
-      <textarea id="demo-in" rows="3" maxlength="1200" placeholder="Great question! I&#x27;d be happy to help you think through this. It&#x27;s worth noting that there are a few different approaches here, each with their own tradeoffs. Let me walk you through them!"></textarea></div>
+      <textarea id="demo-in" rows="3" maxlength="1200" placeholder="Great question! Let me explain how declaude works. It&#x27;s worth noting that the rewrite happens on our own GPU, it never touches a commercial API, and it costs you zero tokens. Let me unpack each of those."></textarea></div>
     <div class="after"><p class="label">After</p>
-      <p id="demo-out">There are a few different approaches here, each with their own tradeoffs. Let me walk you through them.</p></div>
+      <p id="demo-out">The rewrite happens on our own GPU, so it doesn&#x27;t use any commercial APIs and it doesn&#x27;t cost you any tokens.</p></div>
     <div class="demo-bar">
       <button id="demo-go">Translate</button>
       <span id="demo-note" class="hint">No sign-in needed. Type, paste, or drop a file.</span>
