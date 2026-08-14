@@ -45,6 +45,10 @@ section.card{{background:var(--surface);border:1px solid var(--border);border-ra
   padding:.22rem .55rem;border-radius:6px;background:var(--raise);border:1px solid var(--border);
   color:var(--muted)}}
 .badge.pro{{background:rgba(249,115,22,.14);border-color:var(--accent);color:var(--accent)}}
+.banner{{display:flex;align-items:center;gap:.7rem;background:rgba(74,222,128,.08);
+  border:1px solid rgba(74,222,128,.35);border-radius:var(--r);padding:.9rem 1.1rem;
+  margin-bottom:1.25rem;font-size:.94rem}}
+.banner b{{color:var(--green)}}
 .meter{{margin-bottom:1.1rem}}
 .meter:last-of-type{{margin-bottom:0}}
 .meter .top{{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.4rem;
@@ -106,6 +110,9 @@ dialog h2{{font-size:1.15rem;margin-bottom:.3rem}}
 <div id="clerk"></div>
 
 <div id="app" hidden>
+  <p id="upgraded" class="banner" hidden><b>You're on Pro.</b>
+  <span>Unlimited translations and 500 documents a month. Your existing keys keep working.</span></p>
+
   <header>
     <h1>Your account</h1>
     <p class="sub">Translate documents, or connect a client with an API key.</p>
@@ -196,6 +203,10 @@ async function start() {{
 
 function render() {{
   const authed = !!clerk.user;
+  if (authed && new URLSearchParams(location.search).has("upgraded")) {{
+    $("upgraded").hidden = false;
+    history.replaceState({{}}, "", location.pathname);  // survive a refresh without re-showing
+  }}
   $("app").hidden = !authed;
   $("out").hidden = !authed;
   if (authed) {{
