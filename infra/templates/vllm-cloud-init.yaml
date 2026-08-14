@@ -35,7 +35,8 @@ write_files:
         --served-model-name ${model_served_name} \
         --max-model-len ${max_model_len} \
         --tensor-parallel-size ${tensor_parallel} \
-        --gpu-memory-utilization 0.85
+        --gpu-memory-utilization 0.85 \
+        --disable-log-requests
       ExecStop=/usr/bin/docker stop vllm
       StandardOutput=journal+console
 
