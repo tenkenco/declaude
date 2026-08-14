@@ -9,171 +9,169 @@ LANDING_HTML = """<!doctype html>
 <meta name="description" content="An API and MCP server that rewrites Claude-English into plain, natural English. Backed by an open-source model.">
 <style>
 :root{
-  --bg:#0b0e14;--surface:#11151f;--border:#1f2634;
-  --text:#e6e9ef;--muted:#9aa4b2;--accent:#f97316;--accent-soft:#fdba74;
-  --code-bg:#0d1117;--green:#4ade80;--red:#f87171;
+  --bg:#0b0e14;--surface:#11151f;--raise:#161b26;--border:#1f2634;
+  --text:#e6e9ef;--muted:#9aa4b2;--faint:#5b6472;
+  --accent:#f97316;--accent-soft:#fdba74;--code-bg:#0d1117;--green:#4ade80;--red:#f87171;--r:12px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-body{
-  background:var(--bg);color:var(--text);
-  font:16px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-  -webkit-font-smoothing:antialiased;
-}
+body{background:var(--bg);color:var(--text);
+  font:16px/1.65 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased}
 code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-main{max-width:760px;margin:0 auto;padding:0 1.25rem}
-a{color:var(--accent-soft)}
-a:hover{color:var(--accent)}
-header.hero{padding:2rem 0 3rem;text-align:left}
-nav.top{display:flex;align-items:center;gap:1.4rem;padding:1.4rem 0;font-size:.95rem}
-nav.top .logo{margin:0;flex:1}
-nav.top a{color:var(--muted);text-decoration:none}
-nav.top a:hover{color:var(--text)}
+main{max-width:720px;margin:0 auto;padding:0 1.25rem}
+a{color:var(--accent-soft);text-decoration:none}a:hover{color:var(--accent)}
+
+nav.top{display:flex;align-items:center;gap:1.35rem;padding:1.4rem 0;font-size:.95rem}
+nav.top .logo{flex:1;font-weight:600;color:var(--muted)}
+nav.top .logo b{color:var(--accent)}
+nav.top a{color:var(--muted)}nav.top a:hover{color:var(--text)}
+
+header.hero{padding:3.5rem 0 2.5rem;text-align:center}
+h1{font-size:clamp(2rem,5.5vw,3rem);line-height:1.08;letter-spacing:-.03em;margin-bottom:1rem}
+h1 .fade{color:var(--faint)}
+.sub{color:var(--muted);font-size:1.08rem;max-width:34rem;margin:0 auto}
+
+.demo{margin:2.5rem 0 0;border:1px solid var(--border);border-radius:var(--r);
+  overflow:hidden;background:var(--surface);text-align:left}
+.demo>div{padding:1.1rem 1.25rem}
+.demo .before{border-bottom:1px solid var(--border)}
+.demo .label{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.09em;
+  margin-bottom:.45rem;color:var(--faint)}
+.after .label{color:var(--green)}
+.demo p{font-size:.97rem}
+.demo textarea{width:100%;background:transparent;border:0;color:var(--text);font:inherit;
+  font-size:.97rem;resize:vertical;outline:none}
+.demo textarea::placeholder{color:var(--faint)}
+.demo.hot{border-color:var(--accent)}
+.demo-bar{display:flex;gap:.9rem;align-items:center;padding:.85rem 1.25rem;
+  border-top:1px solid var(--border);background:var(--raise)}
+.demo-bar button{background:var(--accent);color:#0b0e14;border:0;border-radius:9px;
+  padding:.5rem 1.15rem;font:inherit;font-weight:600;cursor:pointer}
+.demo-bar button:hover{background:var(--accent-soft)}
+.demo-bar button:disabled{opacity:.5;cursor:default}
+
+.cta-row{display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap;margin-top:2rem}
 .btn{display:inline-block;background:var(--accent);color:#0b0e14 !important;border-radius:10px;
-  padding:.8rem 1.4rem;font-weight:600;text-decoration:none;font-size:1.02rem}
-.btn:hover{background:var(--accent-soft);color:#0b0e14}
+  padding:.8rem 1.5rem;font-weight:600}
+.btn:hover{background:var(--accent-soft);color:#0b0e14 !important}
 .btn.ghost{background:transparent;color:var(--text) !important;border:1px solid var(--border)}
 .btn.ghost:hover{border-color:var(--accent);color:var(--accent) !important}
-.cta-row{display:flex;gap:.9rem;flex-wrap:wrap;align-items:center;margin-top:1.75rem}
-.features{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));margin-top:0}
-.features div{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.2rem 1.3rem}
-.features h3{font-size:1.02rem;margin-bottom:.35rem}
-.features p{color:var(--muted);font-size:.92rem}
-.logo{font-size:1.05rem;font-weight:600;letter-spacing:.02em;color:var(--muted);margin-bottom:2.5rem}
-.logo b{color:var(--accent)}
-h1{font-size:clamp(1.9rem,5vw,2.75rem);line-height:1.15;letter-spacing:-.02em;margin-bottom:1rem}
-.sub{color:var(--muted);font-size:1.125rem;max-width:36rem}
-.demo{margin:2.5rem 0 0;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface)}
-.demo>div{padding:1rem 1.25rem}
-.demo .before{border-bottom:1px solid var(--border)}
-.demo .label{font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.35rem}
-.before .label{color:var(--red)}
-.after .label{color:var(--green)}
-.demo p{color:var(--text);font-size:.95rem}
-.demo textarea{width:100%;background:transparent;border:0;color:var(--text);font:inherit;
-  font-size:.95rem;resize:vertical;outline:none}
-.demo textarea::placeholder{color:#5b6472}
-.demo-bar{display:flex;gap:1rem;align-items:center;padding:.8rem 1.25rem;border-top:1px solid var(--border)}
-.demo-bar button{background:var(--accent);color:#0b0e14;border:0;border-radius:8px;
-  padding:.5rem 1.1rem;font:inherit;font-weight:600;cursor:pointer}
-.demo-bar button:disabled{opacity:.55;cursor:default}
-.demo.hot{outline:2px dashed var(--accent);outline-offset:-2px}
-section{padding:2.5rem 0;border-top:1px solid var(--border)}
-h2{font-size:1.35rem;letter-spacing:-.01em;margin-bottom:.35rem}
-.lead{color:var(--muted);margin-bottom:1.25rem}
-pre{
-  background:var(--code-bg);border:1px solid var(--border);border-radius:10px;
-  padding:1rem 1.25rem;overflow-x:auto;font-size:.85rem;line-height:1.55;margin:.75rem 0;
-}
+
+section{padding:3.25rem 0;border-top:1px solid var(--border)}
+h2{font-size:1.25rem;letter-spacing:-.015em;margin-bottom:1.5rem}
+.ways{display:grid;gap:1.75rem;grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.ways h3{font-size:.98rem;margin-bottom:.3rem;display:flex;align-items:center;gap:.5rem}
+.ways .n{width:1.4rem;height:1.4rem;border-radius:50%;background:var(--raise);
+  border:1px solid var(--border);color:var(--accent);font-size:.75rem;font-weight:700;
+  display:inline-flex;align-items:center;justify-content:center}
+.ways p{color:var(--muted);font-size:.9rem}
+.ways code{font-size:.8rem;color:var(--accent-soft)}
+
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:10px;
+  padding:.95rem 1.15rem;overflow-x:auto;font-size:.83rem;line-height:1.6;margin:.6rem 0}
 pre code{color:#d2d8e0}
-.cta{margin-top:1.75rem;font-size:1.02rem}
 .hint{color:var(--muted);font-size:.9rem}
-.hint code{background:var(--code-bg);border:1px solid var(--border);border-radius:5px;padding:.1rem .35rem;font-size:.82em}
-ul.pricing{list-style:none;display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-top:1.25rem}
-ul.pricing li{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.4rem}
-ul.pricing .tier{font-weight:600;margin-bottom:.25rem}
-ul.pricing .price{font-size:1.6rem;font-weight:700;margin-bottom:.5rem}
-ul.pricing .price small{font-size:.9rem;font-weight:400;color:var(--muted)}
-ul.pricing p{color:var(--muted);font-size:.92rem}
-footer{border-top:1px solid var(--border);padding:2rem 0 3rem;color:var(--muted);font-size:.9rem}
-footer nav{display:flex;gap:1.5rem;flex-wrap:wrap}
+.hint code{background:var(--code-bg);border:1px solid var(--border);border-radius:5px;
+  padding:.1rem .35rem;font-size:.82em}
+
+table.price{width:100%;border-collapse:collapse;font-size:.94rem}
+table.price th,table.price td{padding:.7rem .5rem;text-align:left;border-bottom:1px solid var(--border)}
+table.price th{color:var(--faint);font-weight:500;font-size:.8rem;text-transform:uppercase;
+  letter-spacing:.07em}
+table.price td:first-child{color:var(--muted)}
+table.price .amount{font-size:1.05rem;font-weight:600;color:var(--text)}
+table.price .amount small{color:var(--muted);font-weight:400;font-size:.8rem}
+
+footer{padding:2.5rem 0 3.5rem;border-top:1px solid var(--border);color:var(--faint);font-size:.88rem}
+footer nav{display:flex;gap:1.25rem;flex-wrap:wrap}
+footer a{color:var(--muted)}
 </style>
 </head>
 <body>
 <main>
 <nav class="top" aria-label="Main">
-  <p class="logo">de<b>claude</b></p>
-  <a href="/documents">Documents</a>
-  <a href="#mcp">MCP</a>
-  <a href="#api">API</a>
+  <span class="logo">de<b>claude</b></span>
+  <a href="/signin">Account</a>
+  <a href="#use">Use it</a>
   <a href="#pricing">Pricing</a>
   <a href="https://github.com/tenkenco/declaude">GitHub</a>
 </nav>
+
 <header class="hero">
-  <h1>Turn Claude-English into plain English.</h1>
-  <p class="sub">declaude strips AI-assistant writing tics: em-dash pileups, hollow
-  superlatives, "delve", "certainly!". Meaning, code, and structure survive intact.
-  An open-source model (Qwen2.5-14B) on our own GPUs; your text never reaches a third-party AI API.</p>
-  <div class="demo" id="try" aria-label="Try it">
+  <h1>Claude writes like this.<br><span class="fade">You don't have to read it.</span></h1>
+  <p class="sub">declaude rewrites assistant-voice into plain English. Meaning, code, and
+  structure survive intact.</p>
+
+  <div class="demo" id="try">
     <div class="before"><p class="label">Before</p>
-      <textarea id="demo-in" rows="3" maxlength="1200" placeholder="Certainly! I'd be delighted to delve into this fascinating topic — it's a testament to the rich tapestry of modern software engineering."></textarea></div>
+      <textarea id="demo-in" rows="3" maxlength="1200" placeholder="Certainly! I'd be delighted to delve into this fascinating topic - it's a testament to the rich tapestry of modern software engineering."></textarea></div>
     <div class="after"><p class="label">After</p>
       <p id="demo-out">Sure. Here's an overview of the topic.</p></div>
     <div class="demo-bar">
       <button id="demo-go">Translate</button>
-      <span id="demo-note" class="hint">No sign-in, 10 a day. Type, paste, or drop a file.
-      Files open the <a href="/documents">documents page</a>.</span>
+      <span id="demo-note" class="hint">No sign-in, 10 a day. Type, paste, or drop a file.</span>
     </div>
   </div>
+
   <div class="cta-row">
-    <a class="btn" href="/signin">Get your free API key</a>
-    <a class="btn ghost" href="/documents">De-Claude a document</a>
+    <a class="btn" href="/signin">Get a free key</a>
+    <a class="btn ghost" href="/documents">Translate a document</a>
   </div>
-  <p class="hint" style="margin-top:.9rem">Free every month: 100 translations + 5 documents. No card required.</p>
 </header>
 
-<section class="features" style="border-top:0;padding-top:0">
-  <div><h3>Claude Code hook</h3><p>Rewrites replies at display time on our GPU. Your
-  transcript, context window, and token bill stay untouched.</p></div>
-  <div><h3>MCP &amp; API</h3><p>One command, browser sign-in, no key pasting. Or POST text
-  to the API and get plain English back.</p></div>
-  <div><h3>Documents</h3><p>Drop a Markdown file, download it de-Clauded. Code blocks,
-  headings, and tables pass through untouched.</p></div>
-  <div><h3>Nothing stored</h3><p>Your text is processed in memory and discarded. Nothing is
-  written to disk, a database, or logs. We keep your account email, hashed keys,
-  and usage counts.</p></div>
-</section>
+<section id="use">
+  <h2>Three ways to use it</h2>
+  <div class="ways">
+    <div>
+      <h3><span class="n">1</span>Claude Code hook</h3>
+      <p>Rewrites replies as they render. Your transcript and token bill stay untouched.</p>
+    </div>
+    <div>
+      <h3><span class="n">2</span>MCP server</h3>
+      <p>Browser sign-in, no key pasting.</p>
+    </div>
+    <div>
+      <h3><span class="n">3</span>Documents</h3>
+      <p>Drop a Markdown file, get it back rewritten.</p>
+    </div>
+  </div>
 
-<section id="mcp">
-  <h2>Quickstart: MCP</h2>
-  <p class="lead">Add declaude to any MCP client over HTTP. The tool <code>translate</code> is exposed at <code>/mcp</code>.</p>
   <pre><code>claude mcp add --transport http declaude \\
   https://speak-english.tenken.co/mcp</code></pre>
-  <p class="hint">No key needed. Your MCP client opens a browser sign-in (OAuth).
-  Prefer a key? <a href="/signin">Mint one</a> and pass it as a
-  <code>Authorization: Bearer</code> header.</p>
-</section>
 
-<section id="api">
-  <h2>Quickstart: REST API</h2>
-  <p class="lead">One endpoint: <code>POST /v1/translate</code>. Send text, get plain English back.</p>
   <pre><code>curl -X POST https://speak-english.tenken.co/v1/translate \\
-  -H "Authorization: Bearer &lt;your api key&gt;" \\
-  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer $DECLAUDE_TOKEN" \\
   -d '{"text": "Certainly! Let me delve into that."}'
 
 {"translation": "Sure, here you go.", "model": "qwen2.5-14b-instruct"}</code></pre>
+  <p class="hint">Runs on an open-source model (Qwen2.5-14B) on our own GPUs. Your text is
+  processed in memory and discarded: never written to disk, a database, or logs.</p>
 </section>
 
 <section id="pricing">
   <h2>Pricing</h2>
-  <p class="lead">Start free. At the limit the API returns 402 with a payment link.</p>
-  <ul class="pricing">
-    <li>
-      <p class="tier">Free</p>
-      <p class="price">$0 <small>/ month</small></p>
-      <p>100 translations + 5 documents (up to 200&nbsp;KB each) per month.
-      No card required. Remaining quota reported via <code>X-RateLimit-Remaining</code>.</p>
-    </li>
-    <li>
-      <p class="tier">Unlimited</p>
-      <p class="price">$5 <small>/ month</small></p>
-      <p>Unlimited translations and 500 documents/month (up to 2&nbsp;MB each).
-      When the free tier runs out the API responds <code>402 Payment Required</code>
-      with a payment link. Subscribe and keep the same key.</p>
-    </li>
-  </ul>
+  <table class="price">
+    <thead><tr><th></th><th>Free</th><th>$5 / month</th></tr></thead>
+    <tbody>
+      <tr><td>Translations</td><td>100 / month</td><td>Unlimited</td></tr>
+      <tr><td>Documents</td><td>5 / month, 200 KB</td><td>500 / month, 2 MB</td></tr>
+      <tr><td>Card required</td><td>No</td><td>Yes</td></tr>
+      <tr><td></td><td class="amount">$0</td><td class="amount">$5 <small>/ mo</small></td></tr>
+    </tbody>
+  </table>
+  <p class="hint" style="margin-top:1.1rem">At the free limit the API returns
+  <code>402</code> with a payment link. Subscribing keeps the same key.</p>
 </section>
 
 <footer>
   <nav aria-label="Footer">
-    <a href="https://github.com/tenkenco/declaude">github.com/tenkenco/declaude</a>
-    <a href="#mcp">MCP quickstart</a>
-    <a href="#api">API</a>
-    <a href="#pricing">Pricing</a>
+    <a href="https://github.com/tenkenco/declaude">GitHub</a>
     <a href="/documents">Documents</a>
+    <a href="/signin">Account</a>
+    <a href="#pricing">Pricing</a>
   </nav>
-  <p class="hint" style="margin-top:.9rem">Based on
+  <p style="margin-top:.9rem">Based on
   <a href="https://github.com/gvzdv/claudish-to-english" rel="noopener">claudish-to-english</a>
   by <a href="https://github.com/gvzdv" rel="noopener">gvzdv</a>, the original local-Ollama
   hook this service grew out of.</p>
