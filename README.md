@@ -1,12 +1,47 @@
-# declaude
+<h1 align="center">declaude</h1>
 
-**Claude-English → plain English, as a service.**
+<p align="center">
+  <strong>Claude-English → plain English, as a service.</strong><br>
+  Strips sycophantic openers, hollow superlatives and hedging filler.<br>
+  Meaning, code and structure survive intact.
+</p>
 
-Declaude is a translation service that rewrites the distinctive, sycophantic writing style of AI assistants into plain, natural English. The service uses a robust open-source model (Qwen2.5-14B) running on dedicated GPU infrastructure, ensuring that your data never touches a commercial AI provider. It offers a generous free tier of 100 translations per month, with unlimited usage available for just $5 per month. Developers can integrate Declaude through a REST API, an MCP server, or a drop-in Claude Code plugin.
+<p align="center">
+  <a href="https://github.com/tenkenco/declaude/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/tenkenco/declaude/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/tenkenco/declaude/actions/workflows/security.yml"><img alt="Security" src="https://github.com/tenkenco/declaude/actions/workflows/security.yml/badge.svg"></a>
+  <a href="https://github.com/tenkenco/declaude/actions/workflows/daily.yml"><img alt="Daily checks" src="https://github.com/tenkenco/declaude/actions/workflows/daily.yml/badge.svg"></a>
+  <a href="https://codecov.io/gh/tenkenco/declaude"><img alt="Coverage" src="https://codecov.io/gh/tenkenco/declaude/branch/main/graph/badge.svg"></a>
+</p>
 
-**Live**: [speak-english.tenken.co](https://speak-english.tenken.co) · [Get an API key](https://speak-english.tenken.co/signin)
+<p align="center">
+  <a href="https://registry.modelcontextprotocol.io"><img alt="MCP registry" src="https://img.shields.io/badge/MCP%20registry-io.github.tenkenco%2Fdeclaude-f97316"></a>
+  <a href="https://speak-english.tenken.co"><img alt="Live" src="https://img.shields.io/badge/live-speak--english.tenken.co-4ade80"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue"></a>
+  <img alt="Python" src="https://img.shields.io/badge/python-3.12%2B-3776ab">
+</p>
 
-> The paragraph above was written by an AI assistant, then rewritten by declaude itself.
+---
+
+```
+Before  Certainly! I'd be delighted to delve into this fascinating topic —
+        it's a testament to the rich tapestry of modern software engineering.
+
+After   Sure. Here's an overview of the topic.
+```
+
+Runs on an open-source model (Qwen2.5-14B-AWQ) on our own L4 GPUs, so your text never
+reaches a commercial AI provider. Prompt logging is disabled at the model server: text is
+processed in memory and discarded, never written to disk, a database, or logs.
+
+**Live**: [speak-english.tenken.co](https://speak-english.tenken.co) ·
+[Get an API key](https://speak-english.tenken.co/signin) ·
+[Translate a document](https://speak-english.tenken.co/documents)
+
+| | Free | $5 / month |
+|---|---|---|
+| Translations | 100 / month | Unlimited |
+| Documents | 5 / month, 200 KB | 500 / month, 2 MB |
+| Card required | No | Yes |
 
 ## Quick start
 

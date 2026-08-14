@@ -1,0 +1,28 @@
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /gateway
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+    commit-message: { prefix: "chore(deps)" }
+    groups:
+      dev-dependencies:
+        dependency-type: development
+      runtime-minor-and-patch:
+        dependency-type: production
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    commit-message: { prefix: "chore(ci)" }
+
+  - package-ecosystem: terraform
+    directory: /infra
+    schedule: { interval: weekly, day: monday }
+    commit-message: { prefix: "chore(infra)" }
+
+  - package-ecosystem: docker
+    directory: /gateway
+    schedule: { interval: weekly, day: monday }
+    commit-message: { prefix: "chore(deps)" }

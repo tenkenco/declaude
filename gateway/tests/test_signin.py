@@ -60,7 +60,8 @@ def test_signin_page_is_lightweight(client):
     """
     body = client.get("/signin")
     assert len(body.content) < 20 * 1024
-    assert body.text.count("<script src=") == 1  # Clerk only
+    assert body.text.count("clerk.browser.js") == 1  # one external script: Clerk
+    assert body.text.count("<script") == 2  # Clerk loader + one inline block
 
 
 def test_signin_html_never_leaks_a_secret_key():

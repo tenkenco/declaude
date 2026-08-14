@@ -1,0 +1,72 @@
+name: Daily checks
+
+on:
+  schedule:
+    - cron: "23 7 * * *"
+  workflow_dispatch:
+
+jobs:
+  tests:
+    name: Full test suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - working-directory: gateway
+        run: uv sync --dev
+      - working-directory: gateway
+        run: uv run pytest -q
+
+  production:
+    name: Production smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Every public surface answers
+        run: |
+          set -euo pipefail
+          BASE=https://speak-english.tenken.co
+          check() {
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$1")
+            echo "$2 -> $code"
+            [ "$code" = "${3:-200}" ] || { echo "::error::$2 returned $code, expected ${3:-200}"; exit 1; }
+          }
+          check "$BASE/health"      "health"
+          check "$BASE/"            "landing"
+          check "$BASE/signin"      "account"
+          check "$BASE/documents"   "documents"
+          check "$BASE/og.png"      "social card"
+          check "$BASE/robots.txt"  "robots"
+          check "$BASE/sitemap.xml" "sitemap"
+          check "$BASE/.well-known/oauth-authorization-server" "oauth discovery"
+
+      - name: The model actually translates
+        run: |
+          set -euo pipefail
+          OUT=$(curl -sS -X POST https://speak-english.tenken.co/v1/demo \
+            -H "Content-Type: application/json" \
+            -d '{"text":"Great question! This is a robust, production-ready solution."}')
+          echo "$OUT"
+          echo "$OUT" | grep -q '"translation"' || { echo "::error::demo endpoint returned no translation"; exit 1; }
+
+      - name: Unauthenticated MCP still advertises OAuth
+        run: |
+          set -euo pipefail
+          H=$(curl -sS -o /dev/null -D - -X POST https://speak-english.tenken.co/mcp \
+            -H "Content-Type: application/json" \
+            -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}')
+          echo "$H" | grep -qi "resource_metadata" || { echo "::error::MCP 401 lost its discovery hint"; exit 1; }
+
+      - name: TLS certificate has time left
+        run: |
+          set -euo pipefail
+          END=$(echo | openssl s_client -connect speak-english.tenken.co:443 -servername speak-english.tenken.co 2>/dev/null | openssl x509 -noout -enddate | cut -d= -f2)
+          DAYS=$(( ( $(date -d "$END" +%s) - $(date +%s) ) / 86400 ))
+          echo "certificate expires in $DAYS days ($END)"
+          [ "$DAYS" -gt 14 ] || { echo "::error::certificate expires in $DAYS days"; exit 1; }
+
+      - name: Still listed in the MCP registry
+        run: |
+          set -euo pipefail
+          curl -sS "https://registry.modelcontextprotocol.io/v0/servers?search=declaude" \
+            | grep -q "io.github.tenkenco/declaude" || { echo "::error::registry entry missing"; exit 1; }
