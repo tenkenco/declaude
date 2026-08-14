@@ -54,8 +54,18 @@ button.tiny{{padding:.32rem .7rem;font-size:.82rem}}
 .row{{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center}}
 pre{{background:var(--code);border:1px solid var(--border);border-radius:9px;padding:.85rem 1rem;
   overflow-x:auto;font-size:.84rem;white-space:pre-wrap;word-break:break-all}}
+.copyable{{position:relative}}
+.copyable pre{{padding-right:3rem}}
+.copybtn{{position:absolute;top:.5rem;right:.5rem;background:var(--raise);border:1px solid var(--border);
+  border-radius:7px;padding:.35rem;line-height:0;cursor:pointer;color:var(--muted);transition:.15s}}
+.copybtn:hover{{background:var(--surface);color:var(--text);border-color:var(--accent)}}
+.copybtn svg{{width:15px;height:15px;display:block;pointer-events:none}}
+.copybtn.done{{color:var(--green);border-color:var(--green)}}
 dialog{{border:1px solid var(--border);border-radius:var(--r);background:var(--surface);
-  color:var(--text);padding:0;max-width:540px;width:calc(100% - 2.5rem)}}
+  color:var(--text);padding:0;max-width:540px;width:calc(100% - 2.5rem);
+  /* the * reset above wipes the UA stylesheet's margin:auto, which is what centres
+     a showModal() dialog - restore it explicitly */
+  margin:auto;position:fixed;inset:0}}
 dialog::backdrop{{background:rgba(4,6,10,.72)}}
 .modal-in{{padding:1.6rem}}
 dialog h2{{font-size:1.15rem;margin-bottom:.3rem}}
@@ -112,15 +122,19 @@ dialog h2{{font-size:1.15rem;margin-bottom:.3rem}}
   <div class="modal-in">
     <h2>Your new API key</h2>
     <p class="warn">Copy it now. It is shown once and stored only as a hash.</p>
-    <pre id="key"></pre>
-    <div class="row" style="margin-top:.9rem">
-      <button id="copy">Copy key</button>
-      <button id="copycmd" class="ghost">Copy hook command</button>
-      <button id="closem" class="ghost">Done</button>
+    <div class="copyable">
+      <pre id="key"></pre>
+      <button class="copybtn" data-copy="key" aria-label="Copy key" title="Copy key"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
     </div>
-    <p class="meta" style="margin-top:1rem">Use it in the Claude Code hook
+    <p class="meta" style="margin-top:1.1rem">Use it in the Claude Code hook
     (or export it as <code>DECLAUDE_TOKEN</code>):</p>
-    <pre id="cmd"></pre>
+    <div class="copyable">
+      <pre id="cmd"></pre>
+      <button class="copybtn" data-copy="cmd" aria-label="Copy hook command" title="Copy command"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+    </div>
+    <div class="row" style="margin-top:1.1rem">
+      <button id="closem">Done</button>
+    </div>
   </div>
 </dialog>
 
@@ -195,13 +209,21 @@ async function mint() {{
   }} finally {{ btn.disabled = false; }}
 }}
 
-async function copyText(text, btn, done) {{
-  const label = btn.textContent;
+const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" ' +
+  'stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+
+async function copyFrom(btn) {{
+  const src = $(btn.dataset.copy);
+  const icon = btn.innerHTML;
   try {{
-    await navigator.clipboard.writeText(text);
-    btn.textContent = done;
-  }} catch (e) {{ btn.textContent = "Press Cmd+C"; }}
-  setTimeout(() => {{ btn.textContent = label; }}, 1600);
+    await navigator.clipboard.writeText(src.textContent);
+    btn.innerHTML = CHECK; btn.classList.add("done"); btn.title = "Copied";
+  }} catch (e) {{
+    const r = document.createRange(); r.selectNodeContents(src);
+    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    btn.title = "Press Cmd+C";
+  }}
+  setTimeout(() => {{ btn.innerHTML = icon; btn.classList.remove("done"); btn.title = "Copy"; }}, 1600);
 }}
 
 async function sendDoc(f) {{
@@ -231,8 +253,8 @@ async function sendDoc(f) {{
 document.addEventListener("click", async (e) => {{
   const t = e.target;
   if (t.id === "mint") return mint();
-  if (t.id === "copy") return copyText($("key").textContent, t, "Copied");
-  if (t.id === "copycmd") return copyText($("cmd").textContent, t, "Copied");
+  const cp = t.closest?.(".copybtn");
+  if (cp) return copyFrom(cp);
   if (t.id === "closem") return $("key-modal").close();
   if (t.id === "out") return clerk.signOut();
   if (t.id === "drop" || t.closest?.("#drop")) return $("dfile").click();
