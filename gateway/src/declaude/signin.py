@@ -39,6 +39,23 @@ section.card{{background:var(--surface);border:1px solid var(--border);border-ra
 #drop:hover,#drop.hot{{border-color:var(--accent);background:#0f1420;color:var(--text)}}
 #drop b{{display:block;color:var(--text);font-weight:600;margin-bottom:.2rem}}
 .meta{{color:var(--faint);font-size:.82rem}}
+.usage-head{{display:flex;align-items:center;gap:.75rem;margin-bottom:1.15rem}}
+.usage-head h2{{flex:1;margin:0}}
+.badge{{font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  padding:.22rem .55rem;border-radius:6px;background:var(--raise);border:1px solid var(--border);
+  color:var(--muted)}}
+.badge.pro{{background:rgba(249,115,22,.14);border-color:var(--accent);color:var(--accent)}}
+.meter{{margin-bottom:1.1rem}}
+.meter:last-of-type{{margin-bottom:0}}
+.meter .top{{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.4rem;
+  font-size:.9rem}}
+.meter .top span:last-child{{color:var(--muted);font-size:.85rem;font-variant-numeric:tabular-nums}}
+.bar{{height:7px;border-radius:99px;background:var(--raise);overflow:hidden}}
+.bar i{{display:block;height:100%;background:var(--accent);border-radius:99px;
+  transition:width .35s ease;width:0}}
+.bar i.warn{{background:#fbbf24}}
+.bar i.full{{background:var(--red)}}
+.bar.unlimited i{{width:100%;background:linear-gradient(90deg,var(--accent),var(--accent-soft));opacity:.5}}
 .keylist{{display:flex;flex-direction:column;gap:.5rem;margin-bottom:1rem}}
 .keyrow{{display:flex;align-items:center;gap:.75rem;background:var(--raise);
   border:1px solid var(--border);border-radius:9px;padding:.6rem .85rem}}
@@ -94,6 +111,23 @@ dialog h2{{font-size:1.15rem;margin-bottom:.3rem}}
     <p class="sub">Translate documents, or connect a client with an API key.</p>
     <p class="who"><span class="dot"></span><span id="who"></span></p>
   </header>
+
+  <section class="card" id="usage-card">
+    <div class="usage-head">
+      <h2>This month</h2>
+      <span id="plan" class="badge">Free</span>
+      <a id="upgrade" class="badge pro" href="/upgrade" hidden style="text-decoration:none">Upgrade $5/mo</a>
+    </div>
+    <div class="meter">
+      <div class="top"><span>Translations</span><span id="t-count">—</span></div>
+      <div class="bar" id="t-bar"><i></i></div>
+    </div>
+    <div class="meter">
+      <div class="top"><span>Documents</span><span id="d-count">—</span></div>
+      <div class="bar" id="d-bar"><i></i></div>
+    </div>
+    <p id="u-note" class="meta" style="margin-top:1rem"></p>
+  </section>
 
   <section class="card" id="docs-card">
     <h2>De-Claude a document</h2>
@@ -167,6 +201,7 @@ function render() {{
   if (authed) {{
     $("who").textContent = clerk.user.primaryEmailAddress?.emailAddress || clerk.user.id;
     $("clerk").innerHTML = "";
+    loadUsage();
     loadKeys();
   }} else {{
     clerk.mountSignIn($("clerk"), {{routing:"virtual", forceRedirectUrl: location.href}});
@@ -176,6 +211,40 @@ function render() {{
 function fmtDate(ts) {{
   if (!ts) return "";
   return new Date(ts * 1000).toLocaleDateString(undefined, {{month:"short", day:"numeric", year:"numeric"}});
+}}
+
+function meter(barId, countId, used, limit) {{
+  const fill = $(barId).querySelector("i");
+  if (limit === null) {{
+    $(barId).classList.add("unlimited");
+    $(countId).textContent = used.toLocaleString() + " used · unlimited";
+    return;
+  }}
+  const pct = Math.min(100, Math.round((used / limit) * 100));
+  fill.style.width = pct + "%";
+  fill.className = pct >= 100 ? "full" : pct >= 80 ? "warn" : "";
+  $(countId).textContent = used.toLocaleString() + " / " + limit.toLocaleString();
+}}
+
+async function loadUsage() {{
+  try {{
+    const token = await clerk.session.getToken();
+    const res = await fetch("/v1/usage", {{headers:{{Authorization:"Bearer "+token}}}});
+    if (!res.ok) return;
+    const u = await res.json();
+    const paid = u.plan === "paid";
+    $("plan").textContent = paid ? "Pro" : "Free";
+    $("plan").classList.toggle("pro", paid);
+    $("upgrade").hidden = paid;
+    if (u.upgrade_url) $("upgrade").href = u.upgrade_url;
+    meter("t-bar", "t-count", u.translations.used, u.translations.limit);
+    meter("d-bar", "d-count", u.documents.used, u.documents.limit);
+    const left = u.translations.limit === null ? null : u.translations.limit - u.translations.used;
+    $("u-note").textContent = paid
+      ? "Unlimited translations. Documents reset on the 1st."
+      : (left <= 0 ? "Free translations used up. Upgrade to keep going."
+                   : left + " translations left this month. Resets on the 1st.");
+  }} catch (e) {{ /* best effort */ }}
 }}
 
 async function loadKeys() {{
@@ -245,6 +314,7 @@ async function sendDoc(f) {{
     const left = res.headers.get("X-Documents-Remaining");
     $("dleft").textContent = left !== null ? left + " left this month" : "";
     $("ddone").hidden = false;
+    loadUsage();
   }} catch (err) {{
     $("derror").textContent = err.message; $("derror").hidden = false;
   }} finally {{ $("dbusy").hidden = true; $("dfile").value = ""; }}

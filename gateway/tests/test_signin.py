@@ -52,7 +52,15 @@ def test_unconfigured_gateway_explains_itself(model, usage):
 
 
 def test_signin_page_is_lightweight(client):
-    assert len(client.get("/signin").content) < 15 * 1024
+    """One request, no build step, no framework.
+
+    The page now carries three jobs (usage meters, document upload, key management) plus a
+    modal, so the budget moved 15 -> 20 KB uncompressed, which is ~5 KB over the wire after
+    gzip. The number exists to stop a framework sneaking in, not to freeze the feature set.
+    """
+    body = client.get("/signin")
+    assert len(body.content) < 20 * 1024
+    assert body.text.count("<script src=") == 1  # Clerk only
 
 
 def test_signin_html_never_leaks_a_secret_key():
