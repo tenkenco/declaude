@@ -25,7 +25,7 @@ resource "google_monitoring_notification_channel" "email" {
   display_name = "declaude ops email"
   type         = "email"
   labels = {
-    email_address = "rryoung98@tenken.co"
+    email_address = var.alert_email
   }
 }
 

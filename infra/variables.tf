@@ -79,3 +79,9 @@ variable "ga_measurement_id" {
   type        = string
   default     = "G-JBN8232J0G"
 }
+
+variable "alert_email" {
+  description = "Email for budget and uptime alerts (kept out of source)"
+  type        = string
+  default     = ""
+}
