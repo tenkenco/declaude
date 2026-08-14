@@ -5,7 +5,7 @@ import re
 import time
 from collections.abc import Callable
 from typing import Annotated
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlencode
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import (
@@ -209,12 +209,21 @@ def create_app(
         return RawResponse(content=sitemap_xml(settings.public_base_url), media_type="application/xml")
 
     @app.get("/upgrade", include_in_schema=False)
-    async def upgrade(ref: str = ""):
-        """Stable human-facing upgrade URL; 402 payloads and hook notices can always point here."""
+    async def upgrade(ref: str = "", email: str = ""):
+        """Stable human-facing upgrade URL; 402 payloads and hook notices can always point here.
+
+        `email` prefills Stripe checkout. Without it Stripe Link autofills whatever address it
+        has saved in that browser, which is often not the account being upgraded.
+        """
         if settings.stripe_payment_link:
             url = settings.stripe_payment_link
+            params = {}
             if ref and re.fullmatch(r"[A-Za-z0-9_-]{1,64}", ref):
-                url += ("&" if "?" in url else "?") + "client_reference_id=" + ref
+                params["client_reference_id"] = ref
+            if email and re.fullmatch(r"[^@\s&?=]{1,64}@[^@\s&?=]{1,255}\.[A-Za-z]{2,}", email):
+                params["prefilled_email"] = email
+            if params:
+                url += ("&" if "?" in url else "?") + urlencode(params)
             return RedirectResponse(url, status_code=307)
         return HTMLResponse("<h1>declaude Pro</h1><p>Payments are not configured yet. Contact the operator.</p>")
 

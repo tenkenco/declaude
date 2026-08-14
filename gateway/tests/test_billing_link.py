@@ -31,3 +31,25 @@ def test_upgrade_redirect_appends_client_reference(client):
 def test_upgrade_without_ref_still_redirects(client):
     r = client.get("/upgrade", follow_redirects=False)
     assert r.headers["location"] == "https://buy.stripe.com/x"
+
+
+# --- Stripe Link autofills a saved browser email; prefill the real account email instead ---
+
+def test_upgrade_prefills_email(client):
+    r = client.get("/upgrade", params={"ref": "user_123", "email": "a@b.co"}, follow_redirects=False)
+    loc = r.headers["location"]
+    assert "client_reference_id=user_123" in loc
+    assert "prefilled_email=a%40b.co" in loc
+
+
+def test_upgrade_rejects_bogus_email(client):
+    r = client.get("/upgrade", params={"ref": "user_123", "email": "not an email"},
+                   follow_redirects=False)
+    assert "prefilled_email" not in r.headers["location"]
+    assert "client_reference_id=user_123" in r.headers["location"]
+
+
+def test_upgrade_email_cannot_inject_params(client):
+    r = client.get("/upgrade", params={"ref": "user_123", "email": "a@b.co&utm=evil"},
+                   follow_redirects=False)
+    assert "utm=evil" not in r.headers["location"]
