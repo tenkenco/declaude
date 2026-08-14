@@ -48,5 +48,5 @@ def test_page_does_not_pile_up_em_dashes(client):
 
 def test_demo_hint_states_a_real_number(client):
     html = client.get("/").text
-    assert "10 a day" in html
+    assert "No sign-in needed" in html
     assert "a few tries" not in html
