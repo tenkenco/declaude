@@ -218,8 +218,17 @@ def create_app(
     async def create_api_key(user_id: SessionUserId):
         """Mint a long-lived API key. The plaintext is returned once and never stored."""
         key = generate_key()
-        await usage.add_api_key(hash_key(key), user_id)
+        await usage.add_api_key(hash_key(key), user_id, prefix=key[:7] + "\u2026" + key[-4:])
         return {"key": key}
+
+    @app.get("/v1/keys")
+    async def list_api_keys(user_id: SessionUserId):
+        return {"keys": await usage.list_api_keys(user_id)}
+
+    @app.delete("/v1/keys/{key_id}", status_code=204)
+    async def delete_api_key(key_id: str, user_id: SessionUserId):
+        if not await usage.delete_api_key(user_id, key_id):
+            raise HTTPException(404, "no such key")
 
     @app.get("/healthz")
     @app.get("/health")  # /healthz is intercepted by the Google Frontend on run.app URLs
