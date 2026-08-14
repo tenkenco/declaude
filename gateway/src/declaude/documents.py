@@ -2,7 +2,7 @@
 
 The domain model is the Block: a document is a sequence of prose and code blocks.
 Code fences, indented code, and headings-only blocks pass through untouched;
-prose blocks go through the model in batched chunks.
+prose blocks go through the model one call per block, concurrently.
 """
 import asyncio
 import re
@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 from .model import ModelClient
 from .prompts import SYSTEM_PROMPT
+
 
 class ModelUnavailable(RuntimeError):
     """Raised when no block could be translated at all — the caller should return 503."""
@@ -109,7 +110,7 @@ async def translate_document(text: str, model: ModelClient, concurrency: int = 6
         async with sem:
             try:
                 result = (await model.complete(SYSTEM_PROMPT, block.text)).strip()
-            except Exception:
+            except Exception:  # noqa: BLE001 - any upstream failure degrades this block only
                 failures += 1  # keep the original text for this block
                 return
             if result:
