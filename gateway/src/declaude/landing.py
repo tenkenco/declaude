@@ -122,6 +122,7 @@ footer nav{display:flex;gap:1.5rem;flex-wrap:wrap}
     <a href="#mcp">MCP quickstart</a>
     <a href="#api">API</a>
     <a href="#pricing">Pricing</a>
+    <a href="/documents">Documents</a>
   </nav>
   <p class="hint" style="margin-top:.9rem">Based on
   <a href="https://github.com/gvzdv/claudish-to-english" rel="noopener">claudish-to-english</a>

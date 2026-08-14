@@ -17,6 +17,7 @@ from pydantic import BaseModel, field_validator
 
 from .auth import Authenticator
 from .config import Settings
+from .documents import ALLOWED_SUFFIXES, translate_document
 from .keys import generate_key, hash_key
 from .landing import LANDING_HTML
 from .model import ModelClient
@@ -254,6 +255,52 @@ def create_app(
             return None
         meta = settings.public_base_url.rstrip("/") + "/.well-known/oauth-protected-resource"
         return {"WWW-Authenticate": f'Bearer resource_metadata="{meta}"'}
+
+    # ---- Documents: upload a file, get the de-Clauded version back ----
+
+    @app.get("/documents", include_in_schema=False)
+    async def documents_page():
+        from .documents_page import documents_html
+
+        pk = settings.clerk_publishable_key
+        return HTMLResponse(documents_html(pk, clerk_js_for(pk)))
+
+    @app.post("/v1/documents")
+    async def upload_document(request: Request, response: Response):
+        user_id = await authenticate(request)
+        form = await request.form()
+        upload = form.get("file")
+        if upload is None or isinstance(upload, str):
+            raise HTTPException(400, "multipart field 'file' required")
+        suffix = "." + (upload.filename or "").rsplit(".", 1)[-1].lower()
+        if suffix not in ALLOWED_SUFFIXES:
+            raise HTTPException(415, f"supported types: {', '.join(sorted(ALLOWED_SUFFIXES))}")
+        paid = await usage.is_paid(user_id)
+        max_bytes = settings.doc_max_bytes_paid if paid else settings.doc_max_bytes_free
+        raw = await upload.read()
+        if len(raw) > max_bytes:
+            limit_note = "" if paid else " — paid accounts get larger limits"
+            raise HTTPException(413, f"file exceeds {max_bytes} bytes{limit_note}")
+        period = "docs:" + current_period()
+        used = await usage.get(user_id, period)
+        doc_limit = settings.paid_monthly_documents if paid else settings.free_tier_monthly_documents
+        if used >= doc_limit:
+            detail = {"error": "document quota exhausted", "limit": doc_limit}
+            if not paid:
+                detail["upgrade_url"] = settings.public_base_url.rstrip("/") + "/upgrade"
+            raise HTTPException(402, detail)
+        try:
+            text = raw.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise HTTPException(415, "file must be UTF-8 text") from exc
+        result = await translate_document(text, model)
+        await usage.increment(user_id, period)  # record after success only
+        stem, _, ext = (upload.filename or "document.md").rpartition(".")
+        out_name = f"{stem or 'document'}.declauded.{ext}"
+        response.headers["Content-Disposition"] = f'attachment; filename="{out_name}"'
+        response.headers["X-Documents-Remaining"] = str(doc_limit - used - 1)
+        media = "text/markdown" if ext in ("md", "markdown") else "text/plain"
+        return PlainTextResponse(result, headers=dict(response.headers), media_type=media)
 
     # ---- OAuth 2.1 (MCP clients: discovery, DCR, PKCE) ----
 
