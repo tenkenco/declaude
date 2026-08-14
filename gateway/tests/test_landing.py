@@ -35,3 +35,18 @@ def test_landing_uses_canonical_domain_not_run_app(client):
     html = client.get("/").text
     assert "speak-english.tenken.co" in html
     assert "run.app" not in html  # raw Cloud Run URLs must never appear in marketing copy
+
+
+def test_page_does_not_pile_up_em_dashes(client):
+    """The page that mocks em-dash pileups may not contain one."""
+    import re
+
+    body = re.sub(r"<(script|style)[\s\S]*?</\1>", "", client.get("/").text)
+    text = re.sub(r"<[^>]+>", " ", body)
+    assert text.count("\u2014") <= 1, f"{text.count(chr(8212))} em-dashes in landing copy"
+
+
+def test_demo_hint_states_a_real_number(client):
+    html = client.get("/").text
+    assert "10 a day" in html
+    assert "a few tries" not in html

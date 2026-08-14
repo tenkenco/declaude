@@ -16,7 +16,7 @@ _PAGE = """<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>declaude — sign in and get your API key</title>
+<title>declaude: sign in and get your API key</title>
 <style>
 :root{{
   --bg:#0b0e14;--surface:#11151f;--border:#1f2634;
@@ -57,8 +57,8 @@ pre{{background:var(--code-bg);border:1px solid var(--border);border-radius:10px
 <main>
   <p class="logo">de<b>claude</b></p>
   <h1>Get your API key</h1>
-  <p class="sub">Sign in with GitHub, Google, or an email code. Your key does not expire —
-  use it in a Claude Code hook, an MCP client, or a shell profile.</p>
+  <p class="sub">Sign in with GitHub, Google, or an email code. Your key never expires.
+  Use it in a Claude Code hook, an MCP client, or a shell profile.</p>
 
   <div id="clerk"></div>
 
@@ -81,7 +81,7 @@ pre{{background:var(--code-bg);border:1px solid var(--border);border-radius:10px
     </div>
     <input id="dfile" type="file" accept=".md,.markdown,.txt,.rst" hidden>
     <p id="dbusy" hidden style="margin-top:.75rem">Translating <b id="dname"></b>&hellip;</p>
-    <p id="ddone" hidden style="margin-top:.75rem">Done — download started. <span id="dleft" class="hint"></span></p>
+    <p id="ddone" hidden style="margin-top:.75rem">Download started. <span id="dleft" class="hint"></span></p>
     <p id="derror" class="err" hidden style="margin-top:.75rem"></p>
   </section>
 
