@@ -18,6 +18,8 @@ class Settings(BaseModel):
     public_base_url: str = "https://speak-english.tenken.co"
     ga_measurement_id: str = ""
     price_usd_per_month: str = "5.00"
+    demo_daily_limit: int = 10
+    demo_max_chars: int = 1200
 
     @classmethod
     def from_env(cls) -> "Settings":
