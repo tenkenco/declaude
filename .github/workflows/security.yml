@@ -33,7 +33,11 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - name: Bandit-equivalent lint (ruff S rules)
         working-directory: gateway
-        run: uvx ruff check --select S --output-format github .
+        # Production code is scanned strictly. Tests are scanned with the fixture-noise rules
+        # off: S101 is how a test asserts, and S105/S106 fire on obviously fake tokens.
+        run: |
+          uvx ruff check --select S --output-format github src/
+          uvx ruff check --select S --ignore S101,S105,S106 --output-format github tests/
 
   secrets:
     name: Secret scan
@@ -42,9 +46,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0   # gitleaks needs history to catch a secret added and later removed
-      - uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # gitleaks-action requires a paid licence for organisations; the CLI does not.
+      - name: Scan full history for secrets
+        run: |
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks_8.28.0_linux_x64.tar.gz \
+            | tar -xz gitleaks
+          ./gitleaks detect --source . --redact --verbose --exit-code 1
 
   codeql:
     name: CodeQL
