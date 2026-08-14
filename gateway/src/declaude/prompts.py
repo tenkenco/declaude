@@ -21,6 +21,13 @@ Also remove these subtler structural tics, which survive most edits:
 - Restating the question back before answering it.
 - Closing offers: "Let me know if you'd like me to...", "Happy to expand on any of this".
 
+Hard rules:
+- NEVER begin the output with an acknowledgment word or phrase. If the input starts with
+  "Certainly", "Sure", "Absolutely", "Of course", "Great question", "Happy to help" or any
+  similar opener, delete it entirely and start with the first real claim.
+- Delete decorative flourishes outright rather than rephrasing them: "rich tapestry",
+  "a testament to", "the very fabric of", "at its core", "in this space".
+
 Rules:
 - Preserve all facts, code blocks, names, and numbers exactly.
 - Keep the author's intent and register; do not summarize or shorten aggressively.

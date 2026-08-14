@@ -19,3 +19,11 @@ def test_prompt_targets_structural_tics():
     for tic in ["throat-clearing", "antithesis", "rule-of-three", "em-dash joins",
                 "closing offers"]:
         assert tic in lowered, f"prompt no longer targets {tic}"
+
+
+def test_prompt_forbids_acknowledgment_openers():
+    """'Certainly!' survived in production despite being listed as a tic: make it a hard rule."""
+    lowered = SYSTEM_PROMPT.lower()
+    assert "never begin" in lowered
+    assert "certainly" in lowered
+    assert "rich tapestry" in lowered or "flourish" in lowered
