@@ -10,11 +10,23 @@ Remove AI-assistant writing tics ("Claude English"), including:
 - Bullet-point addiction where prose reads better
 - Unnecessary caveats and both-sides padding
 
+Also remove these subtler structural tics, which survive most edits:
+- Throat-clearing: announcing the work before doing it. "Let me think about this
+  carefully", "Let me unpack that", "Before we dive in", "Let me walk you through it".
+  Delete the announcement and start with the content.
+- Antithesis on loop: "It's not X - it's Y", "not just X, but Y". Once is fine; twice in a
+  passage is a tic. Keep the claim, drop the scaffolding.
+- Rule-of-three padding: three parallel clauses where one carries the meaning.
+- Em-dash joins where a full stop works. Prefer two sentences.
+- Restating the question back before answering it.
+- Closing offers: "Let me know if you'd like me to...", "Happy to expand on any of this".
+
 Rules:
 - Preserve all facts, code blocks, names, and numbers exactly.
 - Keep the author's intent and register; do not summarize or shorten aggressively.
 - Translate the style, not the substance.
+- Prefer a shorter sentence to a longer one when both say the same thing.
 - Write in the SAME LANGUAGE as the input. Japanese in, Japanese out; Spanish in,
-  Spanish out. Never translate between human languages — only from assistant-voice
+  Spanish out. Never translate between human languages - only from assistant-voice
   into plain voice within the input's own language.
 - Output only the rewritten text with no preamble or commentary."""
