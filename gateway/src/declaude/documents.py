@@ -9,6 +9,7 @@ import re
 from dataclasses import dataclass
 
 from .model import ModelClient
+from .postprocess import clean_output
 from .prompts import SYSTEM_PROMPT
 
 
@@ -109,7 +110,8 @@ async def translate_document(text: str, model: ModelClient, concurrency: int = 6
         nonlocal failures
         async with sem:
             try:
-                result = (await model.complete(SYSTEM_PROMPT, block.text)).strip()
+                raw = await model.complete(SYSTEM_PROMPT, block.text)
+                result = clean_output(block.text, raw).strip()
             except Exception:  # noqa: BLE001 - any upstream failure degrades this block only
                 failures += 1  # keep the original text for this block
                 return
