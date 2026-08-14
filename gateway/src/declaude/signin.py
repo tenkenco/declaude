@@ -64,11 +64,12 @@ pre{{background:var(--code-bg);border:1px solid var(--border);border-radius:10px
 
   <section id="issue" class="card" hidden>
     <p>You are signed in as <b id="who"></b>.</p>
+    <div id="keys" style="margin-top:1rem"></div>
     <div class="row">
       <button id="mint">Create an API key</button>
       <button id="out" class="ghost">Sign out</button>
     </div>
-    <p class="hint" style="margin-top:.75rem">A new key does not revoke an old one.</p>
+    <p class="hint" style="margin-top:.75rem">A new key does not revoke an old one. Deleting a key stops it working immediately.</p>
     <p id="error" class="err" hidden></p>
   </section>
 
@@ -125,12 +126,37 @@ async function start() {{
   render();
 }}
 
+async function loadKeys() {{
+  try {{
+    const token = await clerk.session.getToken();
+    const res = await fetch("/v1/keys", {{ headers: {{ Authorization: "Bearer " + token }} }});
+    if (!res.ok) return;
+    const items = (await res.json()).keys;
+    const el = $("keys");
+    if (!items.length) {{ el.innerHTML = '<p class="hint">No API keys yet.</p>'; return; }}
+    el.innerHTML = items.map((k) =>
+      '<div class="row" style="justify-content:space-between;border:1px solid var(--border);border-radius:8px;padding:.5rem .8rem;margin-bottom:.5rem">' +
+      '<code>' + k.prefix + '</code><span class="hint">' +
+      (k.created_at ? new Date(k.created_at * 1000).toLocaleDateString() : "legacy") +
+      '</span><button class="ghost" data-del="' + k.id + '">Delete</button></div>').join("");
+  }} catch (e) {{ /* list is best-effort */ }}
+}}
+document.addEventListener("click", async (e) => {{
+  const id = e.target.dataset && e.target.dataset.del;
+  if (!id) return;
+  if (!confirm("Delete this key? Anything using it stops working immediately.")) return;
+  const token = await clerk.session.getToken();
+  await fetch("/v1/keys/" + id, {{ method: "DELETE", headers: {{ Authorization: "Bearer " + token }} }});
+  loadKeys();
+}});
+
 function render() {{
   if (clerk.user) {{
     $("who").textContent =
       clerk.user.primaryEmailAddress?.emailAddress || clerk.user.id;
     show($("issue"), true);
     $("clerk").innerHTML = "";
+    loadKeys();
   }} else {{
     show($("issue"), false);
     show($("result"), false);
@@ -151,6 +177,7 @@ async function mint() {{
     if (!res.ok) throw new Error("server returned " + res.status);
     const data = await res.json();
     $("key").textContent = data.key;
+    loadKeys();
     $("cmd").textContent =
       'export DECLAUDE_TOKEN=' + data.key;
     show($("result"), true);

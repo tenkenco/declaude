@@ -21,7 +21,11 @@ class UsageStore(ABC):
     @abstractmethod
     async def get_user_for_key(self, key_hash: str) -> str | None: ...
     @abstractmethod
-    async def add_api_key(self, key_hash: str, user_id: str) -> None: ...
+    async def add_api_key(self, key_hash: str, user_id: str, prefix: str = "") -> None: ...
+    @abstractmethod
+    async def list_api_keys(self, user_id: str) -> list[dict]: ...
+    @abstractmethod
+    async def delete_api_key(self, user_id: str, key_hash: str) -> bool: ...
     @abstractmethod
     async def put_oauth_code(self, code_hash: str, data: dict) -> None: ...
     @abstractmethod
@@ -65,8 +69,22 @@ class InMemoryUsageStore(UsageStore):
     def add_api_key_sync(self, key_hash: str, user_id: str) -> None:
         self._keys[key_hash] = user_id
 
-    async def add_api_key(self, key_hash: str, user_id: str) -> None:
+    async def add_api_key(self, key_hash: str, user_id: str, prefix: str = "") -> None:
         self._keys[key_hash] = user_id
+        self._key_meta = getattr(self, "_key_meta", {})
+        self._key_meta[key_hash] = {"prefix": prefix, "created_at": __import__("time").time()}
+
+    async def list_api_keys(self, user_id: str) -> list[dict]:
+        meta = getattr(self, "_key_meta", {})
+        return [{"id": h, **meta.get(h, {"prefix": "", "created_at": 0})}
+                for h, uid in self._keys.items() if uid == user_id]
+
+    async def delete_api_key(self, user_id: str, key_hash: str) -> bool:
+        if self._keys.get(key_hash) != user_id:
+            return False
+        del self._keys[key_hash]
+        getattr(self, "_key_meta", {}).pop(key_hash, None)
+        return True
 
     async def put_oauth_code(self, code_hash: str, data: dict) -> None:
         self._codes = getattr(self, "_codes", {})
@@ -122,8 +140,28 @@ class FirestoreUsageStore(UsageStore):
             return None
         return snapshot.get("user_id")
 
-    async def add_api_key(self, key_hash: str, user_id: str) -> None:
-        await self._db.collection("apikeys").document(key_hash).set({"user_id": user_id})
+    async def add_api_key(self, key_hash: str, user_id: str, prefix: str = "") -> None:
+        import time as _time
+
+        await self._db.collection("apikeys").document(key_hash).set(
+            {"user_id": user_id, "prefix": prefix, "created_at": _time.time()})
+
+    async def list_api_keys(self, user_id: str) -> list[dict]:
+        q = self._db.collection("apikeys").where("user_id", "==", user_id)
+        out = []
+        async for doc in q.stream():
+            d = doc.to_dict()
+            out.append({"id": doc.id, "prefix": d.get("prefix", ""),
+                        "created_at": d.get("created_at", 0)})
+        return sorted(out, key=lambda x: x["created_at"])
+
+    async def delete_api_key(self, user_id: str, key_hash: str) -> bool:
+        ref = self._db.collection("apikeys").document(key_hash)
+        snap = await ref.get()
+        if not snap.exists or snap.to_dict().get("user_id") != user_id:
+            return False
+        await ref.delete()
+        return True
 
     async def put_oauth_code(self, code_hash: str, data: dict) -> None:
         await self._db.collection("oauth_codes").document(code_hash).set(data)

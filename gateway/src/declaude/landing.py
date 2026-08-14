@@ -24,7 +24,21 @@ code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 main{max-width:760px;margin:0 auto;padding:0 1.25rem}
 a{color:var(--accent-soft)}
 a:hover{color:var(--accent)}
-header.hero{padding:5rem 0 3rem;text-align:left}
+header.hero{padding:2rem 0 3rem;text-align:left}
+nav.top{display:flex;align-items:center;gap:1.4rem;padding:1.4rem 0;font-size:.95rem}
+nav.top .logo{margin:0;flex:1}
+nav.top a{color:var(--muted);text-decoration:none}
+nav.top a:hover{color:var(--text)}
+.btn{display:inline-block;background:var(--accent);color:#0b0e14 !important;border-radius:10px;
+  padding:.8rem 1.4rem;font-weight:600;text-decoration:none;font-size:1.02rem}
+.btn:hover{background:var(--accent-soft);color:#0b0e14}
+.btn.ghost{background:transparent;color:var(--text) !important;border:1px solid var(--border)}
+.btn.ghost:hover{border-color:var(--accent);color:var(--accent) !important}
+.cta-row{display:flex;gap:.9rem;flex-wrap:wrap;align-items:center;margin-top:1.75rem}
+.features{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));margin-top:0}
+.features div{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.2rem 1.3rem}
+.features h3{font-size:1.02rem;margin-bottom:.35rem}
+.features p{color:var(--muted);font-size:.92rem}
 .logo{font-size:1.05rem;font-weight:600;letter-spacing:.02em;color:var(--muted);margin-bottom:2.5rem}
 .logo b{color:var(--accent)}
 h1{font-size:clamp(1.9rem,5vw,2.75rem);line-height:1.15;letter-spacing:-.02em;margin-bottom:1rem}
@@ -59,12 +73,19 @@ footer nav{display:flex;gap:1.5rem;flex-wrap:wrap}
 </head>
 <body>
 <main>
-<header class="hero">
+<nav class="top" aria-label="Main">
   <p class="logo">de<b>claude</b></p>
+  <a href="/documents">Documents</a>
+  <a href="#mcp">MCP</a>
+  <a href="#api">API</a>
+  <a href="#pricing">Pricing</a>
+  <a href="https://github.com/tenkenco/declaude">GitHub</a>
+</nav>
+<header class="hero">
   <h1>Turn Claude-English into plain English.</h1>
-  <p class="sub">declaude is a translation API and MCP server that strips AI-assistant
-  writing tics — em-dash pileups, hollow superlatives, "delve", "certainly!" — while
-  preserving meaning exactly. Backed by an open-source model (Qwen2.5-14B on dedicated GPUs) on GCP.</p>
+  <p class="sub">declaude strips AI-assistant writing tics — em-dash pileups, hollow
+  superlatives, "delve", "certainly!" — while preserving meaning exactly. An open-source
+  model (Qwen2.5-14B) running on our own GPUs; your text never touches a third-party AI API.</p>
   <div class="demo" role="figure" aria-label="Before and after example">
     <div class="before"><p class="label">Before</p>
       <p>Certainly! I'd be delighted to delve into this fascinating topic — it's a
@@ -72,8 +93,21 @@ footer nav{display:flex;gap:1.5rem;flex-wrap:wrap}
     <div class="after"><p class="label">After</p>
       <p>Sure. Here's an overview of the topic.</p></div>
   </div>
-  <p class="cta"><a href="/signin">Sign in and get an API key</a> — free for 100 translations a month.</p>
+  <div class="cta-row">
+    <a class="btn" href="/signin">Get your free API key</a>
+    <a class="btn ghost" href="/documents">De-Claude a document</a>
+  </div>
+  <p class="hint" style="margin-top:.9rem">Free every month: 100 translations + 5 documents. No card required.</p>
 </header>
+
+<section class="features" style="border-top:0;padding-top:0">
+  <div><h3>Claude Code hook</h3><p>Rewrites replies at display time on our GPU — your
+  transcript, context window, and token bill are untouched.</p></div>
+  <div><h3>MCP &amp; API</h3><p>One command, browser sign-in, no key pasting. Or POST text
+  to the API and get plain English back.</p></div>
+  <div><h3>Documents</h3><p>Drop a Markdown file, download it de-Clauded. Code blocks,
+  headings, and tables pass through untouched.</p></div>
+</section>
 
 <section id="mcp">
   <h2>Quickstart: MCP</h2>
@@ -93,7 +127,7 @@ footer nav{display:flex;gap:1.5rem;flex-wrap:wrap}
   -H "Content-Type: application/json" \\
   -d '{"text": "Certainly! Let me delve into that."}'
 
-{"translation": "Sure, here you go.", "model": "qwen2.5-32b-instruct"}</code></pre>
+{"translation": "Sure, here you go.", "model": "qwen2.5-14b-instruct"}</code></pre>
 </section>
 
 <section id="pricing">
@@ -103,15 +137,15 @@ footer nav{display:flex;gap:1.5rem;flex-wrap:wrap}
     <li>
       <p class="tier">Free</p>
       <p class="price">$0 <small>/ month</small></p>
-      <p>100 translations per month. No card required.
-      Remaining quota reported via <code>X-RateLimit-Remaining</code>.</p>
+      <p>100 translations + 5 documents (up to 200&nbsp;KB each) per month.
+      No card required. Remaining quota reported via <code>X-RateLimit-Remaining</code>.</p>
     </li>
     <li>
       <p class="tier">Unlimited</p>
       <p class="price">$5 <small>/ month</small></p>
-      <p>Unlimited translations via Stripe. When the free tier runs out, the API
-      responds <code>402 Payment Required</code> with a Stripe payment link — pay
-      once and keep the same token.</p>
+      <p>Unlimited translations and 500 documents/month (up to 2&nbsp;MB each).
+      When the free tier runs out the API responds <code>402 Payment Required</code>
+      with a payment link — subscribe and keep the same key.</p>
     </li>
   </ul>
 </section>
