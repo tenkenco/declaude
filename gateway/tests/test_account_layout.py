@@ -31,3 +31,18 @@ def test_no_legacy_label(client):
 def test_keys_section_explains_purpose(client):
     html = client.get("/signin").text
     assert "hook" in html.lower() and "mcp" in html.lower()
+
+
+def test_modal_is_centered_despite_css_reset(client):
+    """A `* {margin:0}` reset removes the UA margin:auto that centres native dialogs."""
+    css = client.get("/signin").text
+    dialog_rule = css.split("dialog{", 1)[1].split("}", 1)[0]
+    assert "margin:auto" in dialog_rule
+
+
+def test_copy_is_an_icon_button_on_both_blocks(client):
+    html = client.get("/signin").text
+    assert html.count('class="copybtn"') == 2
+    assert 'data-copy="key"' in html and 'data-copy="cmd"' in html
+    assert 'aria-label="Copy key"' in html          # icon-only buttons need a label
+    assert ">Copy key<" not in html                 # the old text buttons are gone
