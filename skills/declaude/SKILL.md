@@ -1,38 +1,92 @@
 ---
 name: declaude
-description: Rewrite "Claude English" (sycophantic AI-assistant prose - "Great question!", "It's worth noting", hedging filler) into plain, natural English via the hosted declaude API. Use when the user asks to de-Claude, simplify, or humanize AI-generated text, wants text translated to plain English, or wants AI writing tics removed from prose, READMEs, docs, or messages.
+description: Rewrite Claude-English (AI-assistant writing tics) into plain English. Use when text sounds sycophantic, padded or hedge-heavy, when de-Claudifying a document, or when checking declaude quota.
 ---
 
-# declaude — plain-English rewriting
+# declaude
 
-Hosted service: `https://speak-english.tenken.co` (open-source Qwen2.5-14B on dedicated GPUs; text never reaches a commercial AI provider).
+Rewrites assistant-voice into plain English. Sycophantic openers, hollow superlatives and
+hedging filler go; meaning, code blocks, headings and tables survive byte-for-byte.
 
-## Auth
+Runs on an open-source model (Qwen2.5-14B) on dedicated hardware, so text never reaches a
+commercial AI provider. Request text is processed in memory and discarded — never written to
+disk, a database, or logs.
 
-Requires an API key in `DECLAUDE_TOKEN` (or a key file at `~/.declaude_key`).
-Humans mint keys at https://speak-english.tenken.co/signin — shown once, never expires.
+**Base URL**: `https://speak-english.tenken.co`
 
-## Rewrite text
+## Setup
 
 ```bash
-TOKEN="${DECLAUDE_TOKEN:-$(cat ~/.declaude_key 2>/dev/null)}"
-curl -sS -X POST https://speak-english.tenken.co/v1/translate \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d "$(jq -n --arg t "$TEXT" '{text:$t}')" | jq -r .translation
+claude mcp add --transport http declaude https://speak-english.tenken.co/mcp
 ```
 
-- Max input: 50,000 chars. Typical latency 1-3s.
-- Preserves facts, code blocks, names, numbers; strips only style.
+No key needed: the client discovers OAuth, opens a browser sign-in, and stores the token.
+Prefer a key? Mint one at [/signin](https://speak-english.tenken.co/signin) — keys never
+expire, and one key works across MCP, REST and the hook.
 
-## Response codes to handle
+## MCP tools
 
-- `402` — free tier (100/month) exhausted. Body has `upgrade_url`; tell the user to visit it. Do not retry.
-- `503` — model warming (spot instance re-heal, ~10-15 min). Honor `Retry-After`; fine to tell the user to retry later.
-- `401` — bad/missing key; point the user at /signin.
+| Tool | Arguments | Returns |
+|---|---|---|
+| `translate` | `text` (string) | The rewritten text |
+| `usage` | none | Plan, translations and documents used against their limits, upgrade link |
 
-## MCP alternative
+Check `usage` before a long batch: it costs nothing and reports exactly how much quota is
+left.
 
-For persistent use inside an MCP client: `claude mcp add --transport http declaude https://speak-english.tenken.co/mcp` — no header needed; the client discovers OAuth and opens a browser sign-in. Exposes a `translate` tool.
+## REST API
+
+```bash
+# Translate
+curl -X POST https://speak-english.tenken.co/v1/translate \
+  -H "Authorization: Bearer $DECLAUDE_TOKEN" -H "Content-Type: application/json" \
+  -d '{"text": "Great question! It is worth noting that..."}'
+# -> {"translation": "...", "model": "qwen2.5-14b-instruct"}
+
+# Translate a whole document (.md, .markdown, .txt, .rst)
+curl -X POST https://speak-english.tenken.co/v1/documents \
+  -H "Authorization: Bearer $DECLAUDE_TOKEN" \
+  -F "file=@notes.md" -o notes.declauded.md
+
+# Check quota
+curl https://speak-english.tenken.co/v1/usage -H "Authorization: Bearer $DECLAUDE_TOKEN"
+```
+
+Authentication accepts a `dk_` API key, an OAuth token, or a Clerk session JWT. URL userinfo
+works too, which is what the hook uses: `https://x:$DECLAUDE_TOKEN@speak-english.tenken.co`.
+
+## Claude Code hook
+
+```bash
+export CLAUDISH_OLLAMA="https://x:$DECLAUDE_TOKEN@speak-english.tenken.co"
+export CLAUDISH_MODEL="qwen2.5-14b-instruct"
+```
+
+The hook rewrites replies at display time on our GPU. Your transcript, context window and
+token bill are untouched, so it costs **zero Claude tokens**.
+
+## Quota and errors
+
+| Limit | Free | Paid ($5/mo) |
+|---|---|---|
+| Translations | 100 / month | Unlimited |
+| Documents | 5 / month, 200 KB each | 500 / month, 2 MB each |
+
+- Only successful calls count against quota; a failure never burns a translation.
+- `402` carries a machine-readable payment challenge with an `upgrade_url`.
+- `413` means the file exceeded the size limit for the plan; `415` means the type is
+  unsupported.
+- `503` means the GPU is warming (spot reclaim); retry shortly.
+- Free-tier responses carry `X-RateLimit-Remaining`; document responses carry
+  `X-Documents-Remaining`.
+
+## Behaviour worth knowing
+
+- **Language is preserved.** Japanese in, Japanese out. If the model answers in a different
+  script than the input, the original text is returned rather than a mistranslation.
+- **Structure is preserved.** Code fences, headings and tables pass through untouched; only
+  prose blocks are rewritten.
+- **Nothing is stored.** Only the account email, SHA-256 key digests, and usage counts.
 
 ## Credit
 

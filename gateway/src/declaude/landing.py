@@ -105,9 +105,9 @@ footer a{color:var(--muted)}
 
   <div class="demo" id="try">
     <div class="before"><p class="label">Before</p>
-      <textarea id="demo-in" rows="3" maxlength="1200" placeholder="Certainly! I'd be delighted to delve into this fascinating topic - it's a testament to the rich tapestry of modern software engineering."></textarea></div>
+      <textarea id="demo-in" rows="3" maxlength="1200" placeholder="Great question! I&#x27;d be happy to help you think through this. It&#x27;s worth noting that there are a few different approaches here, each with their own tradeoffs. Let me walk you through them!"></textarea></div>
     <div class="after"><p class="label">After</p>
-      <p id="demo-out">Sure. Here's an overview of the topic.</p></div>
+      <p id="demo-out">There are a few different approaches here, each with their own tradeoffs. Let me walk you through them.</p></div>
     <div class="demo-bar">
       <button id="demo-go">Translate</button>
       <span id="demo-note" class="hint">No sign-in needed. Type, paste, or drop a file.</span>
