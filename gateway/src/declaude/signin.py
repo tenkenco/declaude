@@ -236,7 +236,11 @@ async function loadUsage() {{
     $("plan").textContent = paid ? "Pro" : "Free";
     $("plan").classList.toggle("pro", paid);
     $("upgrade").hidden = paid;
-    if (u.upgrade_url) $("upgrade").href = u.upgrade_url;
+    if (u.upgrade_url) {{
+      const email = clerk.user.primaryEmailAddress?.emailAddress;
+      // Stripe Link would otherwise autofill a saved browser address, not this account
+      $("upgrade").href = u.upgrade_url + (email ? "&email=" + encodeURIComponent(email) : "");
+    }}
     meter("t-bar", "t-count", u.translations.used, u.translations.limit);
     meter("d-bar", "d-count", u.documents.used, u.documents.limit);
     const left = u.translations.limit === null ? null : u.translations.limit - u.translations.used;
