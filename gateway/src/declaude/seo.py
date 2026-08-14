@@ -58,5 +58,5 @@ Sitemap: {base_url.rstrip("/")}/sitemap.xml
 
 def sitemap_xml(base_url: str) -> str:
     b = base_url.rstrip("/")
-    urls = "".join(f"<url><loc>{b}{p}</loc></url>" for p in ["/", "/signin"])
+    urls = "".join(f"<url><loc>{b}{p}</loc></url>" for p in ["/", "/signin", "/documents"])
     return f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>'

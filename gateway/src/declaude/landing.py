@@ -50,6 +50,14 @@ h1{font-size:clamp(1.9rem,5vw,2.75rem);line-height:1.15;letter-spacing:-.02em;ma
 .before .label{color:var(--red)}
 .after .label{color:var(--green)}
 .demo p{color:var(--text);font-size:.95rem}
+.demo textarea{width:100%;background:transparent;border:0;color:var(--text);font:inherit;
+  font-size:.95rem;resize:vertical;outline:none}
+.demo textarea::placeholder{color:#5b6472}
+.demo-bar{display:flex;gap:1rem;align-items:center;padding:.8rem 1.25rem;border-top:1px solid var(--border)}
+.demo-bar button{background:var(--accent);color:#0b0e14;border:0;border-radius:8px;
+  padding:.5rem 1.1rem;font:inherit;font-weight:600;cursor:pointer}
+.demo-bar button:disabled{opacity:.55;cursor:default}
+.demo.hot{outline:2px dashed var(--accent);outline-offset:-2px}
 section{padding:2.5rem 0;border-top:1px solid var(--border)}
 h2{font-size:1.35rem;letter-spacing:-.01em;margin-bottom:.35rem}
 .lead{color:var(--muted);margin-bottom:1.25rem}
@@ -86,12 +94,16 @@ footer nav{display:flex;gap:1.5rem;flex-wrap:wrap}
   <p class="sub">declaude strips AI-assistant writing tics — em-dash pileups, hollow
   superlatives, "delve", "certainly!" — while preserving meaning exactly. An open-source
   model (Qwen2.5-14B) running on our own GPUs; your text never touches a third-party AI API.</p>
-  <div class="demo" role="figure" aria-label="Before and after example">
-    <div class="before"><p class="label">Before</p>
-      <p>Certainly! I'd be delighted to delve into this fascinating topic — it's a
-      testament to the rich tapestry of modern software engineering.</p></div>
+  <div class="demo" id="try" aria-label="Try it">
+    <div class="before"><p class="label">Before — type, paste, or drop a .md file</p>
+      <textarea id="demo-in" rows="3" maxlength="1200" placeholder="Certainly! I'd be delighted to delve into this fascinating topic — it's a testament to the rich tapestry of modern software engineering."></textarea></div>
     <div class="after"><p class="label">After</p>
-      <p>Sure. Here's an overview of the topic.</p></div>
+      <p id="demo-out">Sure. Here's an overview of the topic.</p></div>
+    <div class="demo-bar">
+      <button id="demo-go">Translate</button>
+      <span id="demo-note" class="hint">Free, no account — a few tries a day. Files land on the
+      <a href="/documents">documents page</a>.</span>
+    </div>
   </div>
   <div class="cta-row">
     <a class="btn" href="/signin">Get your free API key</a>
@@ -107,6 +119,9 @@ footer nav{display:flex;gap:1.5rem;flex-wrap:wrap}
   to the API and get plain English back.</p></div>
   <div><h3>Documents</h3><p>Drop a Markdown file, download it de-Clauded. Code blocks,
   headings, and tables pass through untouched.</p></div>
+  <div><h3>Nothing stored</h3><p>Your text is processed in memory and discarded — never
+  written to disk, a database, or logs. We keep only your account email, hashed keys,
+  and usage counts.</p></div>
 </section>
 
 <section id="mcp">
@@ -164,6 +179,31 @@ footer nav{display:flex;gap:1.5rem;flex-wrap:wrap}
   hook this service grew out of.</p>
 </footer>
 </main>
+<script>
+(function () {
+  const inp = document.getElementById("demo-in"), out = document.getElementById("demo-out"),
+        go = document.getElementById("demo-go"), note = document.getElementById("demo-note"),
+        box = document.getElementById("try");
+  async function run() {
+    const text = inp.value.trim() || inp.placeholder;
+    go.disabled = true; out.textContent = "…";
+    try {
+      const r = await fetch("/v1/demo", { method: "POST",
+        headers: {"Content-Type": "application/json"}, body: JSON.stringify({ text }) });
+      const d = await r.json();
+      if (r.status === 429) { out.textContent = d.error; note.innerHTML = 'Daily demo limit reached — <a href="/signin">get a free key</a> for 100/month.'; }
+      else if (!r.ok) { out.textContent = d.error || "Something went wrong — try again."; }
+      else out.textContent = d.translation;
+    } catch (e) { out.textContent = "Network error — try again."; }
+    go.disabled = false;
+  }
+  go.addEventListener("click", run);
+  inp.addEventListener("keydown", (e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") run(); });
+  ["dragover","dragenter"].forEach((ev) => box.addEventListener(ev, (e) => { e.preventDefault(); box.classList.add("hot"); }));
+  ["dragleave","drop"].forEach((ev) => box.addEventListener(ev, (e) => { e.preventDefault(); box.classList.remove("hot"); }));
+  box.addEventListener("drop", () => { location.href = "/documents"; });
+})();
+</script>
 </body>
 </html>
 """

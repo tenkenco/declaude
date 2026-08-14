@@ -73,6 +73,18 @@ pre{{background:var(--code-bg);border:1px solid var(--border);border-radius:10px
     <p id="error" class="err" hidden></p>
   </section>
 
+  <section id="docs-card" class="card" hidden>
+    <p><b>De-Claude a document</b></p>
+    <div id="drop" style="border:2px dashed var(--border);border-radius:10px;padding:1.6rem 1rem;cursor:pointer;text-align:center;color:var(--muted);margin-top:.75rem">
+      Drop a file here or click to choose
+      <br><span class="hint">.md, .markdown, .txt, .rst</span>
+    </div>
+    <input id="dfile" type="file" accept=".md,.markdown,.txt,.rst" hidden>
+    <p id="dbusy" hidden style="margin-top:.75rem">Translating <b id="dname"></b>&hellip;</p>
+    <p id="ddone" hidden style="margin-top:.75rem">Done — download started. <span id="dleft" class="hint"></span></p>
+    <p id="derror" class="err" hidden style="margin-top:.75rem"></p>
+  </section>
+
   <section id="result" class="card" hidden>
     <p><b>Your API key</b></p>
     <p class="warn">Copy it now. It is shown once and never stored in plain text.</p>
@@ -155,10 +167,12 @@ function render() {{
     $("who").textContent =
       clerk.user.primaryEmailAddress?.emailAddress || clerk.user.id;
     show($("issue"), true);
+    show($("docs-card"), true);
     $("clerk").innerHTML = "";
     loadKeys();
   }} else {{
     show($("issue"), false);
+    show($("docs-card"), false);
     show($("result"), false);
     clerk.mountSignIn($("clerk"));
   }}
@@ -206,6 +220,34 @@ document.addEventListener("click", (e) => {{
   if (e.target.id === "copy") copyText($("key").textContent, e.target, "Copied");
   if (e.target.id === "copycmd") copyText($("cmd").textContent, e.target, "Copied");
 }});
+
+$("drop").addEventListener("click", () => $("dfile").click());
+$("drop").addEventListener("dragover", (e) => e.preventDefault());
+$("drop").addEventListener("drop", (e) => {{ e.preventDefault();
+  if (e.dataTransfer.files[0]) sendDoc(e.dataTransfer.files[0]); }});
+$("dfile").addEventListener("change", () => {{ if ($("dfile").files[0]) sendDoc($("dfile").files[0]); }});
+async function sendDoc(f) {{
+  show($("dbusy"), true); show($("ddone"), false); show($("derror"), false);
+  $("dname").textContent = f.name;
+  try {{
+    const token = await clerk.session.getToken();
+    const fd = new FormData(); fd.append("file", f);
+    const res = await fetch("/v1/documents", {{ method: "POST",
+      headers: {{ Authorization: "Bearer " + token }}, body: fd }});
+    if (!res.ok) throw new Error((await res.text()).slice(0, 180));
+    const blob = await res.blob();
+    const cd = res.headers.get("Content-Disposition") || "";
+    const name = (cd.match(/filename="?([^";]+)"?/) || [null, "declauded.md"])[1];
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    URL.revokeObjectURL(a.href);
+    const left = res.headers.get("X-Documents-Remaining");
+    $("dleft").textContent = left !== null ? left + " documents left this month." : "";
+    show($("ddone"), true);
+  }} catch (err) {{
+    $("derror").textContent = err.message; show($("derror"), true);
+  }} finally {{ show($("dbusy"), false); $("dfile").value = ""; }}
+}}
 </script>
 </body>
 </html>

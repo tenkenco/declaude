@@ -109,3 +109,12 @@ def test_head_tags_carry_og_image(client):
     html = client.get("/").text
     assert 'property="og:image" content="https://speak-english.tenken.co/og.png"' in html
     assert 'name="twitter:card" content="summary_large_image"' in html
+
+
+def test_sitemap_lists_documents(client):
+    assert "/documents</loc>" in client.get("/sitemap.xml").text
+
+
+def test_landing_has_demo_box(client):
+    html = client.get("/").text
+    assert 'id="demo-in"' in html and "/v1/demo" in html

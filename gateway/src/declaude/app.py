@@ -273,6 +273,22 @@ def create_app(
         meta = settings.public_base_url.rstrip("/") + "/.well-known/oauth-protected-resource"
         return {"WWW-Authenticate": f'Bearer resource_metadata="{meta}"'}
 
+    # ---- Anonymous demo (landing page try-it) ----
+
+    @app.post("/v1/demo")
+    async def demo(body: TranslateRequest, request: Request):
+        """No-auth taste of the product. Small cap, per-IP daily throttle, then a nudge to sign up."""
+        if len(body.text) > settings.demo_max_chars:
+            raise HTTPException(413, f"demo accepts up to {settings.demo_max_chars} characters")
+        ip = (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "?")).split(",")[0].strip()
+        period = "demo:" + current_period() + ":" + ip
+        if await usage.get("anon", period) >= settings.demo_daily_limit:
+            raise HTTPException(429, {"error": "demo limit reached — sign up for 100 free translations a month",
+                                      "signup_url": settings.public_base_url.rstrip("/") + "/signin"})
+        translation = await run_translation(body.text)
+        await usage.increment("anon", period)
+        return {"translation": translation}
+
     # ---- Documents: upload a file, get the de-Clauded version back ----
 
     @app.get("/documents", include_in_schema=False)
