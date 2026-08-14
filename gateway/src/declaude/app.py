@@ -332,7 +332,12 @@ def create_app(
             text = raw.decode("utf-8")
         except UnicodeDecodeError as exc:
             raise HTTPException(415, "file must be UTF-8 text") from exc
-        result = await translate_document(text, model)
+        try:
+            result = await translate_document(text, model)
+        except HTTPException:
+            raise
+        except Exception as exc:  # upstream model error must not surface as a 500
+            raise HTTPException(503, "model backend is unavailable; retry shortly") from exc
         await usage.increment(user_id, period)  # record after success only
         safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", upload.filename or "document.md")
         stem, _, ext = safe_name.rpartition(".")

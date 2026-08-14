@@ -4,12 +4,14 @@ The domain model is the Block: a document is a sequence of prose and code blocks
 Code fences, indented code, and headings-only blocks pass through untouched;
 prose blocks go through the model in batched chunks.
 """
+import re
 from dataclasses import dataclass
 
 from .model import ModelClient
 from .prompts import SYSTEM_PROMPT
 
 CHUNK_CHARS = 2500
+MAX_BLOCK_CHARS = 2500  # a single prose block larger than this is subdivided before the model
 ALLOWED_SUFFIXES = {".md", ".markdown", ".txt", ".rst"}
 
 
@@ -17,6 +19,25 @@ ALLOWED_SUFFIXES = {".md", ".markdown", ".txt", ".rst"}
 class Block:
     kind: str  # "prose" | "code"
     text: str
+
+
+def _subdivide(text: str, limit: int = MAX_BLOCK_CHARS) -> list[str]:
+    """Break an oversized prose block on sentence boundaries, then hard-wrap as a last resort."""
+    if len(text) <= limit:
+        return [text]
+    pieces: list[str] = []
+    buf = ""
+    for sentence in re.split(r"(?<=[.!?])\s+", text):
+        while len(sentence) > limit:  # a single monstrous sentence
+            pieces.append(sentence[:limit])
+            sentence = sentence[limit:]
+        if len(buf) + len(sentence) + 1 > limit and buf:
+            pieces.append(buf.strip())
+            buf = ""
+        buf += (" " if buf else "") + sentence
+    if buf.strip():
+        pieces.append(buf.strip())
+    return pieces
 
 
 def split_blocks(text: str) -> list[Block]:
@@ -28,7 +49,9 @@ def split_blocks(text: str) -> list[Block]:
 
     def flush():
         if para:
-            blocks.append(Block("prose", "\n".join(para)))
+            joined = "\n".join(para)
+            for piece in _subdivide(joined):
+                blocks.append(Block("prose", piece))
             para.clear()
 
     while i < len(lines):
