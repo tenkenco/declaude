@@ -11,3 +11,11 @@ def test_prompt_pins_output_language():
 def test_prompt_still_targets_assistant_tics():
     assert "Great question!" in SYSTEM_PROMPT
     assert "Preserve all facts" in SYSTEM_PROMPT
+
+
+def test_prompt_targets_structural_tics():
+    """Sycophancy is the obvious half; these survive most edits and were being missed."""
+    lowered = SYSTEM_PROMPT.lower()
+    for tic in ["throat-clearing", "antithesis", "rule-of-three", "em-dash joins",
+                "closing offers"]:
+        assert tic in lowered, f"prompt no longer targets {tic}"
