@@ -23,10 +23,12 @@
 ---
 
 ```
-Before  Certainly! I'd be delighted to delve into this fascinating topic —
-        it's a testament to the rich tapestry of modern software engineering.
+Before  "Great question! Before I answer, let me make sure I understand what
+        you're asking. You want to know why the build is failing. Let me walk
+        through my thinking, and then I'll give you the answer."
 
-After   Sure. Here's an overview of the topic.
+After   "I understand you want to know why the build is failing. Here's what
+        I think is happening."
 ```
 
 Runs on an open-source model (Qwen2.5-14B-AWQ) on our own L4 GPUs, so your text never
