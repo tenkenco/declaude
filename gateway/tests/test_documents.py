@@ -109,3 +109,36 @@ def test_filename_cannot_inject_headers(client):
     if r.status_code == 200:
         assert "X-Evil" not in r.headers
         assert "\r" not in r.headers.get("content-disposition", "")
+
+
+# --- dogfood finding: one giant paragraph must not blow the model context ---
+
+def test_single_huge_paragraph_is_subdivided(client, model, usage):
+    """A .txt with no blank lines is one block; it must still be chunked before the model."""
+    import anyio
+    anyio.run(usage.set_paid, "user_123", True)
+    text = "Certainly! This is a robust and comprehensive sentence. " * 80  # ~4.5KB, no blank lines
+    r = client.post("/v1/documents", files={"file": ("big.txt", text.encode(), "text/plain")},
+                    headers=BH)
+    assert r.status_code == 200
+    assert model.calls, "model was never called"
+    assert all(len(c["prompt"]) <= 3000 for c in model.calls), \
+        f"oversized prompt: {max(len(c['prompt']) for c in model.calls)}"
+
+
+def test_long_paragraph_content_survives(client, usage):
+    import anyio
+    anyio.run(usage.set_paid, "user_123", True)
+    text = " ".join(f"Sentence number {i} is absolutely robust." for i in range(90))
+    r = client.post("/v1/documents", files={"file": ("s.txt", text.encode(), "text/plain")}, headers=BH)
+    assert r.status_code == 200
+    assert len(r.text) > 100
+
+
+def test_model_failure_is_not_a_500(client, model):
+    async def boom(system, prompt):
+        raise RuntimeError("upstream 400")
+    model.complete = boom
+    r = client.post("/v1/documents", files={"file": ("x.md", b"Certainly! Robust.", "text/markdown")},
+                    headers=BH)
+    assert r.status_code == 503
