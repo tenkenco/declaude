@@ -18,6 +18,7 @@ from fastapi.responses import Response as RawResponse
 from pydantic import BaseModel, field_validator
 
 from .auth import Authenticator
+from .billing import create_portal_session
 from .config import Settings
 from .documents import ALLOWED_SUFFIXES, translate_document
 from .keys import generate_key, hash_key
@@ -285,6 +286,9 @@ def create_app(
         user_id = _webhook_user_id(obj)
         if event_type == "checkout.session.completed" and user_id:
             await usage.set_paid(user_id, True)
+            customer = obj.get("customer")
+            if customer:  # needed later so the customer can cancel from inside the product
+                await usage.set_stripe_customer(user_id, str(customer))
         elif event_type == "customer.subscription.deleted" and user_id:
             await usage.set_paid(user_id, False)
         return {"received": True}
@@ -330,6 +334,15 @@ def create_app(
         if not paid:
             body["upgrade_url"] = settings.public_base_url.rstrip("/") + "/upgrade?ref=" + user_id
         return body
+
+    @app.post("/v1/billing/portal")
+    async def billing_portal(user_id: SessionUserId):
+        """Open Stripe's customer portal so a subscriber can update payment or cancel."""
+        customer = await usage.get_stripe_customer(user_id)
+        if not customer:
+            raise HTTPException(404, "no billing customer for this account")
+        return_url = settings.public_base_url.rstrip("/") + "/signin"
+        return {"url": create_portal_session(customer, return_url)}
 
     @app.get("/v1/usage")
     async def get_usage(user_id: UserId):
