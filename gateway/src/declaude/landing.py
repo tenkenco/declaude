@@ -110,7 +110,7 @@ footer a{color:var(--muted)}
       <p id="demo-out">Sure. Here's an overview of the topic.</p></div>
     <div class="demo-bar">
       <button id="demo-go">Translate</button>
-      <span id="demo-note" class="hint">No sign-in, 10 a day. Type, paste, or drop a file.</span>
+      <span id="demo-note" class="hint">No sign-in needed. Type, paste, or drop a file.</span>
     </div>
   </div>
 
