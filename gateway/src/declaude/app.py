@@ -33,6 +33,7 @@ from .oauth import (
     verify_pkce,
 )
 from .oauth_page import authorize_html
+from .postprocess import clean_output
 from .prompts import SYSTEM_PROMPT
 from .seo import head_tags, json_ld, robots_txt, sitemap_xml
 from .signin import clerk_js_for, signin_html
@@ -158,7 +159,7 @@ def create_app(
         if len(text) > settings.max_input_chars:
             raise HTTPException(422, f"text exceeds {settings.max_input_chars} characters")
         try:
-            return await model.complete(SYSTEM_PROMPT, text)
+            return clean_output(text, await model.complete(SYSTEM_PROMPT, text))
         except HTTPException:
             raise
         except Exception as exc:
