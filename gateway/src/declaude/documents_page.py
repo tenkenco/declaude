@@ -4,7 +4,7 @@ _PAGE = """<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>declaude — documents</title>
+<title>declaude: documents</title>
 <style>
 :root{{--bg:#0b0e14;--surface:#11151f;--border:#1f2634;--text:#e6e9ef;--muted:#9aa4b2;
 --accent:#f97316;--accent-soft:#fdba74;--red:#f87171}}
@@ -32,8 +32,8 @@ button:disabled{{opacity:.55;cursor:default}}
 <body><main>
 <p class="logo">de<b>claude</b></p>
 <h1>De-Claude a document</h1>
-<p class="sub">Upload a Markdown or text file. Prose is rewritten in plain English;
-code blocks, headings, and tables pass through untouched.</p>
+<p class="sub">Upload a Markdown or text file. Prose is rewritten in plain English.
+Code blocks, headings, and tables pass through untouched.</p>
 <div id="clerk"></div>
 <section id="tool" class="card" hidden>
   <div id="drop">Drop a file here or click to choose<br>
@@ -41,7 +41,7 @@ code blocks, headings, and tables pass through untouched.</p>
   </div>
   <input id="file" type="file" accept=".md,.markdown,.txt,.rst" hidden>
   <p id="busy" hidden style="margin-top:1rem"><span class="spin"></span>Translating <b id="fname"></b>&hellip;</p>
-  <p id="done" hidden style="margin-top:1rem">Done — your download started. <span id="left" class="hint"></span></p>
+  <p id="done" hidden style="margin-top:1rem">Download started. <span id="left" class="hint"></span></p>
   <p id="error" class="err" hidden style="margin-top:1rem"></p>
 </section>
 <p class="hint" style="margin-top:2rem"><a href="/">&larr; speak-english.tenken.co</a></p>

@@ -5,7 +5,7 @@ LANDING_HTML = """<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>declaude — Claude-English to plain English</title>
+<title>declaude: Claude-English to plain English</title>
 <meta name="description" content="An API and MCP server that rewrites Claude-English into plain, natural English. Backed by an open-source model.">
 <style>
 :root{
@@ -91,18 +91,18 @@ footer nav{display:flex;gap:1.5rem;flex-wrap:wrap}
 </nav>
 <header class="hero">
   <h1>Turn Claude-English into plain English.</h1>
-  <p class="sub">declaude strips AI-assistant writing tics — em-dash pileups, hollow
-  superlatives, "delve", "certainly!" — while preserving meaning exactly. An open-source
-  model (Qwen2.5-14B) running on our own GPUs; your text never touches a third-party AI API.</p>
+  <p class="sub">declaude strips AI-assistant writing tics: em-dash pileups, hollow
+  superlatives, "delve", "certainly!". Meaning, code, and structure survive intact.
+  An open-source model (Qwen2.5-14B) on our own GPUs; your text never reaches a third-party AI API.</p>
   <div class="demo" id="try" aria-label="Try it">
-    <div class="before"><p class="label">Before — type, paste, or drop a .md file</p>
+    <div class="before"><p class="label">Before</p>
       <textarea id="demo-in" rows="3" maxlength="1200" placeholder="Certainly! I'd be delighted to delve into this fascinating topic — it's a testament to the rich tapestry of modern software engineering."></textarea></div>
     <div class="after"><p class="label">After</p>
       <p id="demo-out">Sure. Here's an overview of the topic.</p></div>
     <div class="demo-bar">
       <button id="demo-go">Translate</button>
-      <span id="demo-note" class="hint">Free, no account — a few tries a day. Files land on the
-      <a href="/documents">documents page</a>.</span>
+      <span id="demo-note" class="hint">No sign-in, 10 a day. Type, paste, or drop a file.
+      Files open the <a href="/documents">documents page</a>.</span>
     </div>
   </div>
   <div class="cta-row">
@@ -113,14 +113,14 @@ footer nav{display:flex;gap:1.5rem;flex-wrap:wrap}
 </header>
 
 <section class="features" style="border-top:0;padding-top:0">
-  <div><h3>Claude Code hook</h3><p>Rewrites replies at display time on our GPU — your
-  transcript, context window, and token bill are untouched.</p></div>
+  <div><h3>Claude Code hook</h3><p>Rewrites replies at display time on our GPU. Your
+  transcript, context window, and token bill stay untouched.</p></div>
   <div><h3>MCP &amp; API</h3><p>One command, browser sign-in, no key pasting. Or POST text
   to the API and get plain English back.</p></div>
   <div><h3>Documents</h3><p>Drop a Markdown file, download it de-Clauded. Code blocks,
   headings, and tables pass through untouched.</p></div>
-  <div><h3>Nothing stored</h3><p>Your text is processed in memory and discarded — never
-  written to disk, a database, or logs. We keep only your account email, hashed keys,
+  <div><h3>Nothing stored</h3><p>Your text is processed in memory and discarded. Nothing is
+  written to disk, a database, or logs. We keep your account email, hashed keys,
   and usage counts.</p></div>
 </section>
 
@@ -129,7 +129,7 @@ footer nav{display:flex;gap:1.5rem;flex-wrap:wrap}
   <p class="lead">Add declaude to any MCP client over HTTP. The tool <code>translate</code> is exposed at <code>/mcp</code>.</p>
   <pre><code>claude mcp add --transport http declaude \\
   https://speak-english.tenken.co/mcp</code></pre>
-  <p class="hint">No key needed — your MCP client opens a browser sign-in (OAuth).
+  <p class="hint">No key needed. Your MCP client opens a browser sign-in (OAuth).
   Prefer a key? <a href="/signin">Mint one</a> and pass it as a
   <code>Authorization: Bearer</code> header.</p>
 </section>
@@ -147,7 +147,7 @@ footer nav{display:flex;gap:1.5rem;flex-wrap:wrap}
 
 <section id="pricing">
   <h2>Pricing</h2>
-  <p class="lead">Start free. Upgrade when you hit the limit — the API tells you how.</p>
+  <p class="lead">Start free. At the limit the API returns 402 with a payment link.</p>
   <ul class="pricing">
     <li>
       <p class="tier">Free</p>
@@ -160,7 +160,7 @@ footer nav{display:flex;gap:1.5rem;flex-wrap:wrap}
       <p class="price">$5 <small>/ month</small></p>
       <p>Unlimited translations and 500 documents/month (up to 2&nbsp;MB each).
       When the free tier runs out the API responds <code>402 Payment Required</code>
-      with a payment link — subscribe and keep the same key.</p>
+      with a payment link. Subscribe and keep the same key.</p>
     </li>
   </ul>
 </section>
@@ -175,7 +175,7 @@ footer nav{display:flex;gap:1.5rem;flex-wrap:wrap}
   </nav>
   <p class="hint" style="margin-top:.9rem">Based on
   <a href="https://github.com/gvzdv/claudish-to-english" rel="noopener">claudish-to-english</a>
-  by <a href="https://github.com/gvzdv" rel="noopener">gvzdv</a> — the original local-Ollama
+  by <a href="https://github.com/gvzdv" rel="noopener">gvzdv</a>, the original local-Ollama
   hook this service grew out of.</p>
 </footer>
 </main>
