@@ -142,3 +142,50 @@ def test_model_failure_is_not_a_500(client, model):
     r = client.post("/v1/documents", files={"file": ("x.md", b"Certainly! Robust.", "text/markdown")},
                     headers=BH)
     assert r.status_code == 503
+
+
+# --- dogfood finding: blocks must never vanish ---
+
+def test_every_block_survives_translation(client, usage, model):
+    import anyio
+    anyio.run(usage.set_paid, "user_123", True)
+    paras = [f"Great question! Paragraph {i} is absolutely robust." for i in range(30)]
+    r = client.post("/v1/documents", files={"file": ("m.md", "\n\n".join(paras).encode(), "text/markdown")},
+                    headers=BH)
+    assert r.status_code == 200
+    out = [p for p in r.text.split("\n\n") if p.strip()]
+    assert len(out) == 30, f"lost blocks: {len(out)}/30"
+    assert len(model.calls) == 30, "each prose block gets its own model call"
+
+
+def test_merging_model_cannot_erase_blocks(client, usage, model):
+    """Even a model that returns one line for any input must not collapse the document."""
+    import anyio
+    anyio.run(usage.set_paid, "user_123", True)
+
+    async def terse(system, prompt):
+        return "ok."
+    model.complete = terse
+    paras = [f"Paragraph {i} here." for i in range(12)]
+    r = client.post("/v1/documents", files={"file": ("t.md", "\n\n".join(paras).encode(), "text/markdown")},
+                    headers=BH)
+    assert len([p for p in r.text.split("\n\n") if p.strip()]) == 12
+
+
+def test_single_block_failure_keeps_original(client, usage, model):
+    import anyio
+    anyio.run(usage.set_paid, "user_123", True)
+    calls = {"n": 0}
+
+    async def flaky(system, prompt):
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise RuntimeError("transient")
+        return "PLAIN::" + prompt
+    model.complete = flaky
+    paras = ["Alpha is robust.", "UNIQUE_MARKER_TEXT here.", "Gamma is robust."]
+    r = client.post("/v1/documents", files={"file": ("f.md", "\n\n".join(paras).encode(), "text/markdown")},
+                    headers=BH)
+    assert r.status_code == 200
+    assert "UNIQUE_MARKER_TEXT" in r.text  # failed block falls back to the original, never dropped
+    assert len([p for p in r.text.split("\n\n") if p.strip()]) == 3

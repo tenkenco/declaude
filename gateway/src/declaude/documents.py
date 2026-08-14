@@ -4,11 +4,16 @@ The domain model is the Block: a document is a sequence of prose and code blocks
 Code fences, indented code, and headings-only blocks pass through untouched;
 prose blocks go through the model in batched chunks.
 """
+import asyncio
 import re
 from dataclasses import dataclass
 
 from .model import ModelClient
 from .prompts import SYSTEM_PROMPT
+
+class ModelUnavailable(RuntimeError):
+    """Raised when no block could be translated at all — the caller should return 503."""
+
 
 CHUNK_CHARS = 2500
 MAX_BLOCK_CHARS = 2500  # a single prose block larger than this is subdivided before the model
@@ -85,37 +90,32 @@ def _translatable(block: Block) -> bool:
     return not (t.startswith("#") and "\n" not in t) and not t.startswith("|")
 
 
-async def translate_document(text: str, model: ModelClient) -> str:
+async def translate_document(text: str, model: ModelClient, concurrency: int = 6) -> str:
+    """Translate every prose block independently, in parallel, preserving structure 1:1.
+
+    One model call per block is the only scheme where a block cannot vanish: no count
+    matching, no merging. Bounded concurrency keeps it faster than the sequential batching
+    it replaces, since vLLM batches concurrent requests. A block whose call fails keeps its
+    original text — degraded, never dropped.
+    """
     blocks = split_blocks(text)
-    out: list[str] = [b.text for b in blocks]
-    # batch consecutive translatable blocks into chunks to cut round-trips
-    batch: list[int] = []
-    size = 0
+    out = [b.text for b in blocks]
+    sem = asyncio.Semaphore(concurrency)
+    targets = [i for i, b in enumerate(blocks) if _translatable(b)]
+    failures = 0
 
-    async def flush_batch():
-        nonlocal size
-        if not batch:
-            return
-        joined = "\n\n".join(out[j] for j in batch)
-        translated = await model.complete(SYSTEM_PROMPT, joined)
-        parts = translated.split("\n\n")
-        if len(parts) == len(batch):
-            for j, part in zip(batch, parts):
-                out[j] = part.strip()
-        else:  # model merged/split paragraphs; keep its prose as one block
-            out[batch[0]] = translated.strip()
-            for j in batch[1:]:
-                out[j] = ""
-        batch.clear()
-        size = 0
+    async def render(idx: int, block: Block) -> None:
+        nonlocal failures
+        async with sem:
+            try:
+                result = (await model.complete(SYSTEM_PROMPT, block.text)).strip()
+            except Exception:
+                failures += 1  # keep the original text for this block
+                return
+            if result:
+                out[idx] = result
 
-    for idx, b in enumerate(blocks):
-        if _translatable(b):
-            if size + len(b.text) > CHUNK_CHARS:
-                await flush_batch()
-            batch.append(idx)
-            size += len(b.text)
-        else:
-            await flush_batch()
-    await flush_batch()
-    return "\n\n".join(s for s in out if s) + "\n"
+    await asyncio.gather(*(render(i, blocks[i]) for i in targets))
+    if targets and failures == len(targets):
+        raise ModelUnavailable("every block failed to translate")
+    return "\n\n".join(out) + "\n"
