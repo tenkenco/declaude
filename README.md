@@ -45,58 +45,68 @@ processed in memory and discarded, never written to disk, a database, or logs.
 
 ## Quick start
 
-**1. Get a key** — sign in at [/signin](https://speak-english.tenken.co/signin). Keys don't expire.
-
-**2. Pick your surface:**
-
 ```bash
-# REST
-curl -X POST https://speak-english.tenken.co/v1/translate \
-  -H "Authorization: Bearer $DECLAUDE_TOKEN" -H "Content-Type: application/json" \
-  -d '{"text": "Great question! It is worth noting that..."}'
-```
-
-```bash
-# MCP (Claude Code, Cursor, any MCP client) — sign-in happens in the browser via OAuth
 claude mcp add --transport http declaude https://speak-english.tenken.co/mcp
 ```
 
-```bash
-# claudish-to-english plugin (drop-in, no local Ollama needed)
-export CLAUDISH_OLLAMA="https://x:$DECLAUDE_TOKEN@speak-english.tenken.co"
-export CLAUDISH_MODEL="qwen2.5-14b-instruct"
-```
+No API key to paste: your client discovers OAuth, opens a browser sign-in, and holds the
+token. That is the whole setup.
 
-Also: [hook/](hook/) for a standalone Claude Code Stop-hook, and [skills/declaude/](skills/declaude/) to
-install declaude as an agent skill.
+| Surface | Use it for | Docs |
+|---|---|---|
+| **MCP server** | Claude Code, Cursor, any MCP client. Tools: `translate`, `usage` | [skill](skills/declaude/SKILL.md) |
+| **Claude Code hook** | Rewrites replies as they render, costs zero Claude tokens | [hook/](hook/) |
+| **Documents** | Drop a `.md`/`.txt`, get it back rewritten | [web](https://speak-english.tenken.co/documents) |
+| **REST API** | `POST /v1/translate`, `/v1/documents`, `/v1/usage` | [skill](skills/declaude/SKILL.md#rest-api) |
 
-## Pricing
-
-100 translations/month free. Past that, requests return `402` with a machine-readable
-payment challenge and an `upgrade_url` → [$5/month, unlimited](https://speak-english.tenken.co/upgrade).
-Only successful translations count against quota.
+Full usage, authentication and quota behaviour live in
+**[skills/declaude/SKILL.md](skills/declaude/SKILL.md)** — installable as an agent skill, so
+your agent can read it directly.
 
 ## Architecture
 
 ```
-client ── API key / Clerk JWT ──> Cloud Run gateway ── VPC ──> internal LB ──> vLLM GPU MIG
-                                     │                                        (Qwen2.5-14B, spot L4)
-                                     ├─> Firestore (usage, paid flags, key hashes)
-                                     └─> Stripe (payment link + signed webhooks)
+client ── API key / OAuth / Clerk JWT ──> Cloud Run gateway ── VPC ──> internal LB ──> vLLM GPU MIG
+                                              │                                    (Qwen2.5-14B, spot L4)
+                                              ├─> Firestore (usage, paid flags, key hashes)
+                                              └─> Stripe (payment link + signed webhooks)
 ```
 
-- **gateway/** — FastAPI: `/v1/translate`, `/mcp`, `/api/chat` (Ollama-compatible), `/v1/keys`,
-  `/v1/billing/webhook`, `/signin`, `/upgrade`, `/health`. 86 tests; every boundary injectable.
-- **infra/** — Terraform, state in GCS, plan converges to zero diff. GPU tier is private-IP spot
-  instances behind an internal L7 LB; template rollouts are deliberate (OPPORTUNISTIC).
-- **hook/** — Claude Code hook client (fails open; never blocks a session).
-- **CI/CD** — PRs: lint + tests (gateway/hook/infra). Main: test → build → deploy via Workload
-  Identity Federation → smoke test.
+- **gateway/** — FastAPI. Every boundary is injectable, which is why the suite runs without
+  network, GPU or cloud credentials.
+- **infra/** — Terraform, state in GCS, plan converges to zero diff. The GPU tier is
+  private-IP spot instances behind an internal L7 load balancer.
+- **hook/** — Claude Code hook client. Fails open; never blocks a session.
+- **CI** — lint, tests and coverage on every PR; security scans and a production smoke test
+  daily.
 
-## Operating notes
+<details>
+<summary><b>Operating notes</b></summary>
 
 - `/healthz` is reserved by Google Frontend on run.app — use `/health`.
 - Model swaps are one Terraform variable; 32B needs 2×L4 (quota bump), 14B fits one L4.
-- Secrets live in Secret Manager only. API keys are stored as SHA-256 digests.
-- Developed strictly test-first; every production defect found in dogfooding became a
-  regression test before its fix.
+- MIG template rollouts are deliberate (`OPPORTUNISTIC`): a proactive policy turned benign
+  template edits into surprise 15-minute outages.
+- Secrets live in Secret Manager only. API keys are stored as SHA-256 digests, so a database
+  leak yields no usable credential.
+- Prompt logging is disabled at the model server; request text is processed in memory and
+  discarded.
+- Developed test-first. Every production defect found while dogfooding became a regression
+  test before its fix.
+
+</details>
+
+## Development
+
+```bash
+cd gateway
+uv sync --dev
+uv run pytest -q          # 197 tests
+uv run ruff check .
+```
+
+## Credit
+
+Grew out of [gvzdv/claudish-to-english](https://github.com/gvzdv/claudish-to-english), the
+original local-Ollama hook. Licensed [MIT](LICENSE); upstream notice in
+[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
