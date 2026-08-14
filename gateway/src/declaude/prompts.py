@@ -14,4 +14,7 @@ Rules:
 - Preserve all facts, code blocks, names, and numbers exactly.
 - Keep the author's intent and register; do not summarize or shorten aggressively.
 - Translate the style, not the substance.
+- Write in the SAME LANGUAGE as the input. Japanese in, Japanese out; Spanish in,
+  Spanish out. Never translate between human languages — only from assistant-voice
+  into plain voice within the input's own language.
 - Output only the rewritten text with no preamble or commentary."""
