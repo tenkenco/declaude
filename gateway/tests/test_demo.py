@@ -29,3 +29,14 @@ def test_demo_ip_throttle(client):
     r = client.post("/v1/demo", json={"text": "hi"})
     assert r.status_code == 429
     assert "/signin" in r.json()["signup_url"]
+
+
+def test_demo_throttle_uses_last_xff_entry(client):
+    """First XFF entry is attacker-controlled; only the LB-appended last entry is trusted."""
+    for i in range(3):
+        r = client.post("/v1/demo", json={"text": "hi"},
+                        headers={"X-Forwarded-For": f"1.2.3.{i}, 9.9.9.9"})
+        assert r.status_code == 200
+    r = client.post("/v1/demo", json={"text": "hi"},
+                    headers={"X-Forwarded-For": "5.6.7.8, 9.9.9.9"})
+    assert r.status_code == 429  # spoofed first hop must not reset the counter
