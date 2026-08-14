@@ -73,3 +73,9 @@ variable "github_repo" {
   type        = string
   default     = "tenkenco/declaude"
 }
+
+variable "ga_measurement_id" {
+  description = "GA4 measurement ID for the landing pages (empty disables the tag)"
+  type        = string
+  default     = "G-JBN8232J0G"
+}

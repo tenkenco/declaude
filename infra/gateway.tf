@@ -93,6 +93,10 @@ resource "google_cloud_run_v2_service" "gateway" {
         value = var.clerk_jwks_url
       }
       env {
+        name  = "DECLAUDE_GA_MEASUREMENT_ID"
+        value = var.ga_measurement_id
+      }
+      env {
         name = "STRIPE_SECRET_KEY"
         value_source {
           secret_key_ref {
