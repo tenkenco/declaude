@@ -19,6 +19,10 @@ class UsageStore(ABC):
     @abstractmethod
     async def set_paid(self, user_id: str, paid: bool) -> None: ...
     @abstractmethod
+    async def set_stripe_customer(self, user_id: str, customer_id: str) -> None: ...
+    @abstractmethod
+    async def get_stripe_customer(self, user_id: str) -> str | None: ...
+    @abstractmethod
     async def get_user_for_key(self, key_hash: str) -> str | None: ...
     @abstractmethod
     async def add_api_key(self, key_hash: str, user_id: str, prefix: str = "") -> None: ...
@@ -55,6 +59,13 @@ class InMemoryUsageStore(UsageStore):
 
     async def set_paid(self, user_id: str, paid: bool) -> None:
         (self._paid.add if paid else self._paid.discard)(user_id)
+
+    async def set_stripe_customer(self, user_id: str, customer_id: str) -> None:
+        self._customers = getattr(self, "_customers", {})
+        self._customers[user_id] = customer_id
+
+    async def get_stripe_customer(self, user_id: str) -> str | None:
+        return getattr(self, "_customers", {}).get(user_id)
 
     # sync helpers for tests
     def get_sync(self, user_id: str, period: str | None = None) -> int:
@@ -133,6 +144,14 @@ class FirestoreUsageStore(UsageStore):
 
     async def set_paid(self, user_id: str, paid: bool) -> None:
         await self._db.collection("users").document(user_id).set({"paid": paid}, merge=True)
+
+    async def set_stripe_customer(self, user_id: str, customer_id: str) -> None:
+        await self._db.collection("users").document(user_id).set(
+            {"stripe_customer_id": customer_id}, merge=True)
+
+    async def get_stripe_customer(self, user_id: str) -> str | None:
+        snap = await self._db.collection("users").document(user_id).get()
+        return snap.to_dict().get("stripe_customer_id") if snap.exists else None
 
     async def get_user_for_key(self, key_hash: str) -> str | None:
         snapshot = await self._db.collection("apikeys").document(key_hash).get()

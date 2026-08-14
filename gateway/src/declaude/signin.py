@@ -124,6 +124,7 @@ dialog h2{{font-size:1.15rem;margin-bottom:.3rem}}
       <h2>This month</h2>
       <span id="plan" class="badge">Free</span>
       <a id="upgrade" class="badge pro" href="/upgrade" hidden style="text-decoration:none">Upgrade $5/mo</a>
+      <button id="manage" class="ghost tiny" hidden>Manage</button>
     </div>
     <div class="meter">
       <div class="top"><span>Translations</span><span id="t-count">—</span></div>
@@ -255,8 +256,9 @@ async function loadUsage() {{
     meter("t-bar", "t-count", u.translations.used, u.translations.limit);
     meter("d-bar", "d-count", u.documents.used, u.documents.limit);
     const left = u.translations.limit === null ? null : u.translations.limit - u.translations.used;
+    $("manage").hidden = !paid;
     $("u-note").textContent = paid
-      ? "Unlimited translations. Documents reset on the 1st."
+      ? "Unlimited translations. Documents reset on the 1st. Cancel any time from Manage."
       : (left <= 0 ? "Free translations used up. Upgrade to keep going."
                    : left + " translations left this month. Resets on the 1st.");
   }} catch (e) {{ /* best effort */ }}
@@ -342,6 +344,17 @@ document.addEventListener("click", async (e) => {{
   if (cp) return copyFrom(cp);
   if (t.id === "closem") return $("key-modal").close();
   if (t.id === "out") return clerk.signOut();
+  if (t.id === "manage") {{
+    t.disabled = true;
+    try {{
+      const token = await clerk.session.getToken();
+      const res = await fetch("/v1/billing/portal", {{method:"POST",
+        headers:{{Authorization:"Bearer "+token}}}});
+      if (!res.ok) throw new Error("could not open billing portal");
+      location.href = (await res.json()).url;
+    }} catch (err) {{ alert(err.message); t.disabled = false; }}
+    return;
+  }}
   if (t.id === "drop" || t.closest?.("#drop")) return $("dfile").click();
   const id = t.dataset && t.dataset.del;
   if (id) {{
