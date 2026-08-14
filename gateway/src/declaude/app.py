@@ -36,6 +36,7 @@ from .oauth import (
 from .oauth_page import authorize_html
 from .postprocess import clean_output
 from .prompts import SYSTEM_PROMPT
+from .security import install as install_security_headers
 from .seo import head_tags, json_ld, robots_txt, sitemap_xml
 from .signin import clerk_js_for, signin_html
 from .usage import UsageStore, current_period
@@ -95,6 +96,12 @@ def create_app(
     webhook_verifier: WebhookVerifier | None = None,
 ) -> FastAPI:
     app = FastAPI(title="declaude", version="0.1.0")
+
+    def _clerk_host() -> str:
+        url = clerk_js_for(settings.clerk_publishable_key)
+        return url.split("//", 1)[-1].split("/", 1)[0] if url else ""
+
+    install_security_headers(app, _clerk_host)
     verify_webhook = webhook_verifier or default_webhook_verifier
 
     async def _resolve_api_key(key: str) -> str:
