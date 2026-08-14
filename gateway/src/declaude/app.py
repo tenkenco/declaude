@@ -52,6 +52,13 @@ TRANSLATE_TOOL = {
 }
 
 
+USAGE_TOOL = {
+    "name": "usage",
+    "description": "Report this account's declaude quota for the current month: plan, translations and documents used against their limits, and an upgrade link when on the free tier.",
+    "inputSchema": {"type": "object", "properties": {}},
+}
+
+
 class TranslateRequest(BaseModel):
     text: str
 
@@ -296,6 +303,29 @@ def create_app(
         await usage.increment("anon", period)
         return {"translation": translation}
 
+    async def _usage_snapshot(user_id: str) -> dict:
+        paid = await usage.is_paid(user_id)
+        period = current_period()
+        body = {
+            "plan": "paid" if paid else "free",
+            "period": period,
+            "translations": {
+                "used": await usage.get(user_id, period),
+                "limit": None if paid else settings.free_tier_monthly_limit,
+            },
+            "documents": {
+                "used": await usage.get(user_id, "docs:" + period),
+                "limit": settings.paid_monthly_documents if paid else settings.free_tier_monthly_documents,
+            },
+        }
+        if not paid:
+            body["upgrade_url"] = settings.public_base_url.rstrip("/") + "/upgrade?ref=" + user_id
+        return body
+
+    @app.get("/v1/usage")
+    async def get_usage(user_id: UserId):
+        return await _usage_snapshot(user_id)
+
     # ---- Documents: upload a file, get the de-Clauded version back ----
 
     @app.get("/documents", include_in_schema=False)
@@ -519,9 +549,22 @@ def create_app(
         if method == "notifications/initialized":
             return Response(status_code=202)
         if method == "tools/list":
-            return rpc_result(msg_id, {"tools": [TRANSLATE_TOOL]})
+            return rpc_result(msg_id, {"tools": [TRANSLATE_TOOL, USAGE_TOOL]})
         if method == "tools/call":
             name = params.get("name")
+            if name == "usage":
+                snap = await _usage_snapshot(user_id)
+                t = snap["translations"]
+                d = snap["documents"]
+                t_line = f"{t['used']} used" + (" of unlimited" if t["limit"] is None else f" of {t['limit']}")
+                lines = [
+                    f"Plan: {snap['plan']}  (period {snap['period']})",
+                    f"Translations: {t_line}",
+                    f"Documents: {d['used']} used of {d['limit']}",
+                ]
+                if snap.get("upgrade_url"):
+                    lines.append(f"Upgrade for unlimited translations: {snap['upgrade_url']}")
+                return rpc_result(msg_id, {"content": [{"type": "text", "text": "\n".join(lines)}]})
             if name != "translate":
                 return JSONResponse(rpc_error(msg_id, -32602, f"unknown tool: {name}"))
             text = (params.get("arguments") or {}).get("text", "")
