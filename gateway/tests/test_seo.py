@@ -95,7 +95,7 @@ def test_402_payload_contains_upgrade_url(bare_client, usage, settings):
         bare_client.post("/v1/translate", json={"text": "hi"}, headers=h)
     r = bare_client.post("/v1/translate", json={"text": "hi"}, headers=h)
     assert r.status_code == 402
-    assert r.json()["upgrade_url"].endswith("/upgrade")
+    assert r.json()["upgrade_url"].endswith("/upgrade?ref=u1")
 
 
 def test_og_image_served(client):

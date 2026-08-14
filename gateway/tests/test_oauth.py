@@ -37,8 +37,9 @@ def pkce():
 
 def do_authorize(client, challenge, redirect="http://localhost:33418/callback", state="st8"):
     """Simulate the approve step: signed-in browser posts its Clerk token."""
+    cid = client.post("/oauth/register", json={"client_name": "t", "redirect_uris": [redirect]}).json()["client_id"]
     return client.post("/oauth/approve", json={
-        "token": "valid-token", "client_id": "cli_x", "redirect_uri": redirect,
+        "token": "valid-token", "client_id": cid, "redirect_uri": redirect,
         "state": state, "code_challenge": challenge, "code_challenge_method": "S256",
     })
 
@@ -83,8 +84,9 @@ def test_register_returns_public_client(client):
 # --- authorize page ---
 
 def test_authorize_serves_signin_page(client):
+    cid = client.post("/oauth/register", json={"client_name": "t", "redirect_uris": ["http://localhost:1/cb"]}).json()["client_id"]
     r = client.get("/oauth/authorize", params={
-        "client_id": "cli_x", "redirect_uri": "http://localhost:1/cb", "response_type": "code",
+        "client_id": cid, "redirect_uri": "http://localhost:1/cb", "response_type": "code",
         "state": "s", "code_challenge": "c", "code_challenge_method": "S256",
     })
     assert r.status_code == 200
@@ -159,7 +161,7 @@ def test_redirect_uri_must_match(client):
 
 def test_approve_requires_valid_session(client):
     r = client.post("/oauth/approve", json={
-        "token": "garbage", "client_id": "c", "redirect_uri": "http://localhost:1/cb",
+        "token": "garbage", "client_id": "cli_any", "redirect_uri": "http://localhost:1/cb",
         "state": "s", "code_challenge": "c", "code_challenge_method": "S256",
     })
     assert r.status_code == 401
@@ -186,9 +188,51 @@ def test_unknown_client_gets_generic_name(client):
 
 
 def test_authorize_page_pins_redirect_and_autoapproves(client):
+    cid = client.post("/oauth/register", json={"client_name": "t", "redirect_uris": ["http://localhost:1/cb"]}).json()["client_id"]
     r = client.get("/oauth/authorize", params={
-        "client_id": "c", "redirect_uri": "http://localhost:1/cb", "response_type": "code",
+        "client_id": cid, "redirect_uri": "http://localhost:1/cb", "response_type": "code",
         "state": "s", "code_challenge": "c", "code_challenge_method": "S256",
     })
     assert "forceRedirectUrl" in r.text   # sign-in must return to this exact page
     assert "autoApprove" in r.text        # signed-in return completes without extra clicks
+
+
+# --- security review: redirect_uri pinning ---
+
+def register(client, uris):
+    return client.post("/oauth/register", json={"client_name": "c", "redirect_uris": uris}).json()
+
+
+def test_authorize_rejects_unregistered_redirect(client):
+    reg = register(client, ["http://localhost:33418/callback"])
+    r = client.get("/oauth/authorize", params={
+        "client_id": reg["client_id"], "redirect_uri": "https://evil.example/cb",
+        "response_type": "code", "code_challenge": "c", "code_challenge_method": "S256"})
+    assert r.status_code == 400
+
+
+def test_approve_rejects_unregistered_redirect(client):
+    reg = register(client, ["http://localhost:33418/callback"])
+    r = client.post("/oauth/approve", json={
+        "token": "valid-token", "client_id": reg["client_id"],
+        "redirect_uri": "https://evil.example/cb", "state": "s",
+        "code_challenge": "c", "code_challenge_method": "S256"})
+    assert r.status_code == 400
+
+
+def test_localhost_port_variance_allowed(client):
+    """MCP clients bind a random localhost port; host match suffices for loopback."""
+    reg = register(client, ["http://localhost:33418/callback"])
+    r = client.post("/oauth/approve", json={
+        "token": "valid-token", "client_id": reg["client_id"],
+        "redirect_uri": "http://localhost:19999/callback", "state": "s",
+        "code_challenge": "c", "code_challenge_method": "S256"})
+    assert r.status_code == 200
+
+
+def test_unknown_client_cannot_authorize(client):
+    r = client.post("/oauth/approve", json={
+        "token": "valid-token", "client_id": "cli_ghost",
+        "redirect_uri": "http://localhost:1/cb", "state": "s",
+        "code_challenge": "c", "code_challenge_method": "S256"})
+    assert r.status_code == 400

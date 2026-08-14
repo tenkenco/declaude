@@ -101,3 +101,11 @@ def test_upload_page_served(client):
     r = client.get("/documents")
     assert r.status_code == 200
     assert "upload" in r.text.lower()
+
+
+def test_filename_cannot_inject_headers(client):
+    r = up(client, name='a".md\r\nX-Evil: 1')
+    assert r.status_code in (200, 415)
+    if r.status_code == 200:
+        assert "X-Evil" not in r.headers
+        assert "\r" not in r.headers.get("content-disposition", "")

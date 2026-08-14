@@ -1,5 +1,7 @@
 """FastAPI application factory. All external dependencies are injected."""
 import base64
+import json
+import re
 import time
 from collections.abc import Callable
 from typing import Annotated
@@ -122,11 +124,11 @@ def create_app(
 
     SessionUserId = Annotated[str, Depends(authenticate_session)]
 
-    def payment_challenge() -> HTTPException:
+    def payment_challenge(user_id: str = "") -> HTTPException:
         body = {
             "error": "payment_required",
             "message": f"Free tier of {settings.free_tier_monthly_limit} translations/month exceeded.",
-            "upgrade_url": settings.public_base_url.rstrip("/") + "/upgrade",
+            "upgrade_url": settings.public_base_url.rstrip("/") + "/upgrade?ref=" + user_id,
             "accepts": [
                 {
                     "scheme": "stripe-payment-link",
@@ -142,7 +144,7 @@ def create_app(
         if await usage.is_paid(user_id):
             return False
         if await usage.get(user_id, current_period()) >= settings.free_tier_monthly_limit:
-            raise payment_challenge()
+            raise payment_challenge(user_id)
         return True
 
     async def record_usage(user_id: str, free_tier: bool, response: Response) -> None:
@@ -199,10 +201,13 @@ def create_app(
         return RawResponse(content=sitemap_xml(settings.public_base_url), media_type="application/xml")
 
     @app.get("/upgrade", include_in_schema=False)
-    async def upgrade():
+    async def upgrade(ref: str = ""):
         """Stable human-facing upgrade URL; 402 payloads and hook notices can always point here."""
         if settings.stripe_payment_link:
-            return RedirectResponse(settings.stripe_payment_link, status_code=307)
+            url = settings.stripe_payment_link
+            if ref and re.fullmatch(r"[A-Za-z0-9_-]{1,64}", ref):
+                url += ("&" if "?" in url else "?") + "client_reference_id=" + ref
+            return RedirectResponse(url, status_code=307)
         return HTMLResponse("<h1>declaude Pro</h1><p>Payments are not configured yet. Contact the operator.</p>")
 
     @app.get("/signin", include_in_schema=False)
@@ -280,7 +285,8 @@ def create_app(
         """No-auth taste of the product. Small cap, per-IP daily throttle, then a nudge to sign up."""
         if len(body.text) > settings.demo_max_chars:
             raise HTTPException(413, f"demo accepts up to {settings.demo_max_chars} characters")
-        ip = (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "?")).split(",")[0].strip()
+        xff = request.headers.get("x-forwarded-for", "")
+        ip = xff.split(",")[-1].strip() if xff else (request.client.host if request.client else "?")
         period = "demo:" + current_period() + ":" + ip
         if await usage.get("anon", period) >= settings.demo_daily_limit:
             raise HTTPException(429, {"error": "demo limit reached — sign up for 100 free translations a month",
@@ -328,7 +334,8 @@ def create_app(
             raise HTTPException(415, "file must be UTF-8 text") from exc
         result = await translate_document(text, model)
         await usage.increment(user_id, period)  # record after success only
-        stem, _, ext = (upload.filename or "document.md").rpartition(".")
+        safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", upload.filename or "document.md")
+        stem, _, ext = safe_name.rpartition(".")
         out_name = f"{stem or 'document'}.declauded.{ext}"
         response.headers["Content-Disposition"] = f'attachment; filename="{out_name}"'
         response.headers["X-Documents-Remaining"] = str(doc_limit - used - 1)
@@ -355,8 +362,8 @@ def create_app(
             pass
         client_id = "cli_" + new_code()[:24]
         name = str(body.get("client_name") or "")[:80]
-        if name:
-            await usage.put_oauth_client(client_id, name)
+        uris = [str(u)[:200] for u in (body.get("redirect_uris") or [])][:10]
+        await usage.put_oauth_client(client_id, json.dumps({"name": name, "redirect_uris": uris}))
         return {
             "client_id": client_id,
             "client_name": name,
@@ -366,6 +373,32 @@ def create_app(
             "response_types": ["code"],
         }
 
+    async def _client_record(client_id: str) -> dict | None:
+        raw = await usage.get_oauth_client(client_id or "")
+        if raw is None:
+            return None
+        try:
+            d = json.loads(raw)
+            return d if isinstance(d, dict) else {"name": str(d), "redirect_uris": []}
+        except (ValueError, TypeError):
+            return {"name": raw, "redirect_uris": []}
+
+    def _redirect_allowed(uri: str, registered: list[str]) -> bool:
+        from urllib.parse import urlparse
+
+        u = urlparse(uri)
+        if u.scheme not in ("http", "https") or not u.hostname:
+            return False
+        if u.scheme == "http" and u.hostname not in ("localhost", "127.0.0.1", "::1"):
+            return False
+        for reg in registered:
+            r = urlparse(reg)
+            if u.hostname in ("localhost", "127.0.0.1", "::1") and r.hostname in ("localhost", "127.0.0.1", "::1"):
+                return True  # loopback: MCP clients bind ephemeral ports
+            if reg == uri:
+                return True
+        return False
+
     @app.get("/oauth/authorize", include_in_schema=False)
     async def oauth_authorize(request: Request):
         p = request.query_params
@@ -373,9 +406,11 @@ def create_app(
             raise HTTPException(400, "PKCE S256 required")
         if not p.get("redirect_uri"):
             raise HTTPException(400, "redirect_uri required")
+        rec = await _client_record(p.get("client_id", ""))
+        if rec is None or not _redirect_allowed(p["redirect_uri"], rec.get("redirect_uris", [])):
+            raise HTTPException(400, "unknown client or unregistered redirect_uri")
         pk = settings.clerk_publishable_key
-        name = await usage.get_oauth_client(p.get("client_id", ""))
-        return HTMLResponse(authorize_html(pk, clerk_js_for(pk), name or ""))
+        return HTMLResponse(authorize_html(pk, clerk_js_for(pk), rec.get("name") or ""))
 
     @app.post("/oauth/approve")
     async def oauth_approve(request: Request):
@@ -388,6 +423,9 @@ def create_app(
         if body.get("code_challenge_method") != "S256" or not body.get("code_challenge"):
             raise HTTPException(400, "PKCE S256 required")
         redirect_uri = body.get("redirect_uri") or ""
+        rec = await _client_record(body.get("client_id", ""))
+        if rec is None or not _redirect_allowed(redirect_uri, rec.get("redirect_uris", [])):
+            raise HTTPException(400, "unknown client or unregistered redirect_uri")
         code = new_code()
         grant = AuthCode(
             user_id=user_id,
