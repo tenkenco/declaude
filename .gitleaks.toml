@@ -1,0 +1,18 @@
+# gitleaks configuration for declaude
+#
+# Only one allowlist entry, deliberately narrow: Clerk PUBLISHABLE keys are public by
+# design - they are served inside our own landing and account page HTML, which is why the
+# gateway derives one from the JWKS URL rather than storing it as a secret. Everything
+# else, including test files, is scanned normally: a real secret must never hide behind a
+# blanket "it is only a test" exemption.
+title = "declaude"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Clerk publishable keys (pk_test_/pk_live_) are non-secret by specification"
+regexTarget = "match"
+regexes = [
+  '''pk_(test|live)_[A-Za-z0-9+/=_-]{8,}''',
+]
