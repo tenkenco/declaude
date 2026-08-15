@@ -99,5 +99,7 @@ def test_csp_allows_what_clerk_needs_to_render_sign_in(client):
 
 def test_csp_allows_analytics_beacons(client):
     d = directives(client.get("/signin").headers["content-security-policy"])
-    assert "https://www.google-analytics.com" in d["connect-src"]
-    assert "https://www.googletagmanager.com" in d["script-src"]
+    # equality per source, not substring: CodeQL reads `"https://host" in text` as a
+    # half-done URL check, and the exact-source form is what the test means anyway
+    assert any(src == "https://www.google-analytics.com" for src in d["connect-src"])
+    assert any(src == "https://www.googletagmanager.com" for src in d["script-src"])
