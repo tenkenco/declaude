@@ -79,14 +79,25 @@ def test_clerk_loader_is_wired_from_a_nonced_script(client, path):
     assert 'getElementById("clerk-js")' in html
 
 
+def directives(csp: str) -> dict[str, list[str]]:
+    """CSP text to {directive: [sources]}. Exact sources, so a check cannot pass on a
+    substring of some other host."""
+    out = {}
+    for part in csp.split(";"):
+        if tokens := part.split():
+            out[tokens[0]] = tokens[1:]
+    return out
+
+
 def test_csp_allows_what_clerk_needs_to_render_sign_in(client):
-    csp = client.get("/signin").headers["content-security-policy"]
-    assert "worker-src 'self' blob:" in csp          # session token refresh worker
-    assert "challenges.cloudflare.com" in csp.split("frame-src")[1].split(";")[0]
-    assert "challenges.cloudflare.com" in csp.split("script-src")[1].split(";")[0]
+    d = directives(client.get("/signin").headers["content-security-policy"])
+    assert d["worker-src"] == ["'self'", "blob:"]          # session token refresh worker
+    turnstile = "https://challenges.cloudflare.com"        # Clerk's bot check, in an iframe
+    assert turnstile in d["frame-src"]
+    assert turnstile in d["script-src"]
 
 
 def test_csp_allows_analytics_beacons(client):
-    connect = client.get("/signin").headers["content-security-policy"]
-    connect = connect.split("connect-src")[1].split(";")[0]
-    assert "google-analytics.com" in connect
+    d = directives(client.get("/signin").headers["content-security-policy"])
+    assert "https://www.google-analytics.com" in d["connect-src"]
+    assert "https://www.googletagmanager.com" in d["script-src"]
