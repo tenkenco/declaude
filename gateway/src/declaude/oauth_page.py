@@ -14,6 +14,7 @@ body{{background:#0b0e14;color:#e6e9ef;font:16px/1.6 ui-sans-serif,system-ui,-ap
 main{{max-width:560px;margin:0 auto;padding:3.5rem 1.25rem;
   display:flex;flex-direction:column;align-items:center;text-align:center}}
 main>*{{width:100%}}
+#clerk{{width:100%;display:flex;justify-content:center}}
 #clerk>div{{display:flex;justify-content:center}}
 .card{{text-align:left}}
 .logo{{font-size:1.05rem;font-weight:600;color:#9aa4b2;margin-bottom:2rem}}.logo b{{color:#f97316}}

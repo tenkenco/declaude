@@ -13,6 +13,7 @@ body{{background:var(--bg);color:var(--text);font:16px/1.6 ui-sans-serif,system-
 main{{max-width:640px;margin:0 auto;padding:3.5rem 1.25rem 4rem;
   display:flex;flex-direction:column;align-items:center;text-align:center}}
 main>*{{width:100%}}
+#clerk{{width:100%;display:flex;justify-content:center}}
 #clerk>div{{display:flex;justify-content:center}}
 a{{color:var(--accent-soft)}}
 .logo{{font-size:1.05rem;font-weight:600;color:var(--muted);margin-bottom:2rem}}.logo b{{color:var(--accent)}}

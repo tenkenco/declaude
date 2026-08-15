@@ -22,6 +22,7 @@ body{{background:var(--bg);color:var(--text);
 code,pre{{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}}
 a{{color:var(--accent-soft);text-decoration:none}}a:hover{{color:var(--accent)}}
 .wrap{{max-width:680px;margin:0 auto;padding:0 1.25rem 5rem}}
+#clerk{{width:100%;display:flex;justify-content:center}}
 nav{{display:flex;align-items:center;gap:1.25rem;padding:1.4rem 0;font-size:.95rem}}
 nav .logo{{flex:1;font-weight:600;color:var(--muted)}}nav .logo b{{color:var(--accent)}}
 nav a{{color:var(--muted)}}nav a:hover{{color:var(--text)}}
