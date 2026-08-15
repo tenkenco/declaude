@@ -45,7 +45,8 @@ Code blocks, headings, and tables pass through untouched.</p>
   <p id="error" class="err" hidden style="margin-top:1rem"></p>
 </section>
 <p class="hint" style="margin-top:2rem"><a href="/">&larr; speak-english.tenken.co</a></p>
-<script src="{clerk_js}" data-clerk-publishable-key="{pk}" crossorigin="anonymous" async onload="start()"></script>
+<script id="clerk-js" src="{clerk_js}" data-clerk-publishable-key="{pk}"
+        crossorigin="anonymous" async></script>
 <script>
 const $ = (id) => document.getElementById(id);
 let clerk;
@@ -98,6 +99,22 @@ async function send(f) {{
     $("busy").hidden = true; $("file").value = "";
   }}
 }}
+
+// The loader is wired here, not with an onload= attribute: a CSP nonce covers this script
+// but never inline event handlers, so an attribute handler is silently dropped and the page
+// stays blank. Clerk may also finish before this script runs, hence the guard.
+function bootClerk() {{
+  const el = document.getElementById("clerk-js");
+  let booted = false;
+  const boot = () => {{ if (!booted) {{ booted = true; start(); }} }};
+  el.addEventListener("load", boot);
+  el.addEventListener("error", () => {{
+    document.getElementById("clerk").innerHTML =
+      '<p class="err">Could not load sign-in. Check your network and reload.</p>';
+  }});
+  if (window.Clerk) boot();
+}}
+bootClerk();
 </script>
 </main></body></html>
 """

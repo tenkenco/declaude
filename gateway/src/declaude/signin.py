@@ -180,8 +180,8 @@ dialog h2{{font-size:1.15rem;margin-bottom:.3rem}}
   </div>
 </dialog>
 
-<script src="{clerk_js}" data-clerk-publishable-key="{pk}" crossorigin="anonymous" async
-        onload="start()" onerror="failed()"></script>
+<script id="clerk-js" src="{clerk_js}" data-clerk-publishable-key="{pk}"
+        crossorigin="anonymous" async></script>
 <script>
 const $ = (id) => document.getElementById(id);
 let clerk = null;
@@ -376,6 +376,19 @@ document.addEventListener("change", (e) => {{
 document.addEventListener("drop", (e) => {{
   if (e.target.closest?.("#drop") && e.dataTransfer.files[0]) sendDoc(e.dataTransfer.files[0]);
 }});
+
+// The loader is wired here, not with onload=/onerror= attributes: a CSP nonce covers this
+// script but never inline event handlers, so attribute handlers are silently dropped and
+// the page stays blank. Clerk may also finish before this script runs, hence the guard.
+function bootClerk() {{
+  const el = document.getElementById("clerk-js");
+  let booted = false;
+  const boot = () => {{ if (!booted) {{ booted = true; start(); }} }};
+  el.addEventListener("load", boot);
+  el.addEventListener("error", failed);
+  if (window.Clerk) boot();
+}}
+bootClerk();
 </script>
 </body>
 </html>

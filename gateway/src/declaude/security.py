@@ -18,16 +18,25 @@ BASE_HEADERS = {
 }
 
 
+# Clerk serves its bot check from Cloudflare Turnstile and keeps sessions fresh in a
+# blob: worker, so both need room in the policy or sign-in renders empty.
+TURNSTILE = "https://challenges.cloudflare.com"
+ANALYTICS = ("https://www.googletagmanager.com https://www.google-analytics.com "
+             "https://*.google-analytics.com https://*.analytics.google.com")
+
+
 def csp(nonce: str, clerk_host: str = "") -> str:
     clerk = f"https://{clerk_host}" if clerk_host else "https://*.clerk.accounts.dev"
     return "; ".join([
         "default-src 'self'",
-        f"script-src 'self' 'nonce-{nonce}' {clerk}",
-        f"connect-src 'self' {clerk} https://*.clerk.accounts.dev",
+        f"script-src 'self' 'nonce-{nonce}' {clerk} {TURNSTILE} https://www.googletagmanager.com",
+        f"connect-src 'self' {clerk} https://*.clerk.accounts.dev {ANALYTICS}",
         "img-src 'self' data: https:",
         # Clerk injects styles at runtime; nonces cannot reach them
         "style-src 'self' 'unsafe-inline'",
         "font-src 'self' data: https:",
+        "worker-src 'self' blob:",
+        f"frame-src 'self' {clerk} {TURNSTILE}",
         "frame-ancestors 'none'",
         "object-src 'none'",
         "base-uri 'self'",
