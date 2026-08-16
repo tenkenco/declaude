@@ -81,7 +81,14 @@ variable "ga_measurement_id" {
 }
 
 variable "alert_email" {
-  description = "Email for budget and uptime alerts (kept out of source)"
+  # No default on purpose. It used to default to "", which meant any plan run without the
+  # variable quietly proposed setting the notification channel's address to null — an apply
+  # would have disabled ops alerting without saying so. Failing loudly is the safer default.
+  description = "Email for budget and uptime alerts (kept out of source; set TF_VAR_alert_email)"
   type        = string
-  default     = ""
+
+  validation {
+    condition     = can(regex("^[^@[:space:]]+@[^@[:space:]]+$", var.alert_email))
+    error_message = "alert_email must be a real address: export TF_VAR_alert_email=ops@example.com"
+  }
 }
