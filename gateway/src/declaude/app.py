@@ -21,6 +21,7 @@ from .auth import Authenticator
 from .billing import create_portal_session
 from .config import Settings
 from .documents import ALLOWED_SUFFIXES, translate_document
+from .guard import repair
 from .keys import generate_key, hash_key
 from .landing import LANDING_HTML
 from .model import ModelClient
@@ -170,11 +171,18 @@ def create_app(
             response.headers["X-RateLimit-Limit"] = str(settings.free_tier_monthly_limit)
             response.headers["X-RateLimit-Remaining"] = str(max(0, settings.free_tier_monthly_limit - count))
 
+    async def _retranslate(para: str) -> str:
+        """Re-translate one paragraph for the attribution guard, with the same cleanup."""
+        return clean_output(para, await model.complete(SYSTEM_PROMPT, para))
+
     async def run_translation(text: str) -> str:
         if len(text) > settings.max_input_chars:
             raise HTTPException(422, f"text exceeds {settings.max_input_chars} characters")
         try:
-            return clean_output(text, await model.complete(SYSTEM_PROMPT, text))
+            draft = clean_output(text, await model.complete(SYSTEM_PROMPT, text))
+            # The model sometimes deletes a paragraph instead of rewriting it; credits and
+            # sources are the usual casualties. Put them back.
+            return await repair(text, draft, _retranslate)
         except HTTPException:
             raise
         except Exception as exc:
@@ -537,7 +545,8 @@ def create_app(
             raise HTTPException(422, f"text exceeds {settings.max_input_chars} characters")
         free_tier = await check_quota(user_id)
         try:
-            content = await model.complete(system, prompt)
+            draft = await model.complete(system, prompt)
+            content = await repair(prompt, draft, lambda para: model.complete(system, para))
         except HTTPException:
             raise
         except Exception as exc:

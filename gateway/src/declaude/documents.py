@@ -8,6 +8,7 @@ import asyncio
 import re
 from dataclasses import dataclass
 
+from .guard import repair
 from .model import ModelClient
 from .postprocess import clean_output
 from .prompts import SYSTEM_PROMPT
@@ -92,6 +93,11 @@ def _translatable(block: Block) -> bool:
     return not (t.startswith("#") and "\n" not in t) and not t.startswith("|")
 
 
+async def _clean_complete(model: ModelClient, para: str) -> str:
+    """One paragraph through the model, with the same output cleanup as a full block."""
+    return clean_output(para, await model.complete(SYSTEM_PROMPT, para))
+
+
 async def translate_document(text: str, model: ModelClient, concurrency: int = 6) -> str:
     """Translate every prose block independently, in parallel, preserving structure 1:1.
 
@@ -112,6 +118,12 @@ async def translate_document(text: str, model: ModelClient, concurrency: int = 6
             try:
                 raw = await model.complete(SYSTEM_PROMPT, block.text)
                 result = clean_output(block.text, raw).strip()
+                # A block cannot vanish here, but facts inside one still can.
+                result = await repair(
+                    block.text,
+                    result,
+                    lambda para: _clean_complete(model, para),
+                )
             except Exception:  # noqa: BLE001 - any upstream failure degrades this block only
                 failures += 1  # keep the original text for this block
                 return
