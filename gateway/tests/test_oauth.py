@@ -51,7 +51,7 @@ def test_protected_resource_metadata(client):
     assert r.status_code == 200
     body = r.json()
     assert body["resource"] == "https://speak-english.tenken.co"
-    assert "https://speak-english.tenken.co" in body["authorization_servers"]
+    assert body["authorization_servers"] == ["https://speak-english.tenken.co"]
 
 
 def test_authorization_server_metadata(client):
