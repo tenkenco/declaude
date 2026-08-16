@@ -10,7 +10,7 @@ jobs:
     name: Full test suite
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v5
       - working-directory: gateway
         run: uv sync --dev
@@ -21,7 +21,7 @@ jobs:
     name: Production smoke test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Every public surface answers
         run: |
           set -euo pipefail
