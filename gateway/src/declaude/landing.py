@@ -171,7 +171,8 @@ footer a{color:var(--muted)}
     <a href="/signin">Account</a>
     <a href="#pricing">Pricing</a>
   </nav>
-  <p style="margin-top:.9rem">Based on
+  <p style="margin-top:.9rem">Built by
+  <a href="https://www.tenken.co" rel="noopener">Tenken</a>. Based on
   <a href="https://github.com/gvzdv/claudish-to-english" rel="noopener">claudish-to-english</a>
   by <a href="https://github.com/gvzdv" rel="noopener">gvzdv</a>, the original local-Ollama
   hook this service grew out of.</p>
