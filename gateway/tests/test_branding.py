@@ -4,6 +4,8 @@ The Clerk card is titled "Sign in to Tenken" — the Clerk application name. Som
 "get an API key" on declaude has never seen that word before, so the page around the widget has
 to account for it rather than leave the visitor guessing whose login screen they landed on.
 """
+import re
+
 import pytest
 
 from declaude.documents_page import documents_html
@@ -27,9 +29,14 @@ def test_page_names_its_maker(name):
     assert "Tenken" in PAGES[name], f"{name}: does not say who built it"
 
 
+# Matched as a full href rather than a substring: a bare `"https://www.tenken.co" in html`
+# check would pass on a link to tenken.co.evil.example and CodeQL rightly flags the pattern.
+TENKEN_LINK = re.compile(r'href="https://www\.tenken\.co/?"')
+
+
 @pytest.mark.parametrize("name", sorted(PAGES))
 def test_maker_is_linked(name):
-    assert "https://www.tenken.co" in PAGES[name], f"{name}: Tenken is named but not linked"
+    assert TENKEN_LINK.search(PAGES[name]), f"{name}: Tenken is named but not linked"
 
 
 @pytest.mark.parametrize("name", ["signin", "authorize"])
