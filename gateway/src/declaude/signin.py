@@ -22,6 +22,8 @@ body{{background:var(--bg);color:var(--text);
 code,pre{{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}}
 a{{color:var(--accent-soft);text-decoration:none}}a:hover{{color:var(--accent)}}
 .wrap{{max-width:680px;margin:0 auto;padding:0 1.25rem 5rem}}
+#clerk{{width:100%;display:flex;justify-content:center}}
+.byline{{color:var(--faint);font-size:.85rem;text-align:center;margin:.9rem 0 0}}
 nav{{display:flex;align-items:center;gap:1.25rem;padding:1.4rem 0;font-size:.95rem}}
 nav .logo{{flex:1;font-weight:600;color:var(--muted)}}nav .logo b{{color:var(--accent)}}
 nav a{{color:var(--muted)}}nav a:hover{{color:var(--text)}}
@@ -179,6 +181,9 @@ dialog h2{{font-size:1.15rem;margin-bottom:.3rem}}
     </div>
   </div>
 </dialog>
+
+<p class="byline">declaude is built by <a href="https://www.tenken.co" rel="noopener">Tenken</a> —
+the name you see on the sign-in card.</p>
 
 <script id="clerk-js" src="{clerk_js}" data-clerk-publishable-key="{pk}"
         crossorigin="anonymous" async></script>

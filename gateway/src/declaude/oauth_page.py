@@ -14,6 +14,8 @@ body{{background:#0b0e14;color:#e6e9ef;font:16px/1.6 ui-sans-serif,system-ui,-ap
 main{{max-width:560px;margin:0 auto;padding:3.5rem 1.25rem;
   display:flex;flex-direction:column;align-items:center;text-align:center}}
 main>*{{width:100%}}
+#clerk{{width:100%;display:flex;justify-content:center}}
+.byline{{color:#5b6472;font-size:.85rem;text-align:center;margin:.9rem 0 0}}
 #clerk>div{{display:flex;justify-content:center}}
 .card{{text-align:left}}
 .logo{{font-size:1.05rem;font-weight:600;color:#9aa4b2;margin-bottom:2rem}}.logo b{{color:#f97316}}
@@ -31,6 +33,8 @@ button{{background:#f97316;color:#0b0e14;border:0;border-radius:8px;padding:.65r
 <h1>Connect {client_name}</h1>
 <p class="sub">Sign in to let <b>{client_name}</b> translate text with your declaude account.</p>
 <div id="clerk"></div>
+<p class="byline">declaude is built by <a href="https://www.tenken.co" rel="noopener">Tenken</a> —
+that is the name on the sign-in card above.</p>
 <section id="done-card" class="card" hidden>
   <p id="status"><span class="spin"></span>Signed in as <b id="who"></b> — returning you to {client_name}&hellip;</p>
   <p id="error" class="err" hidden></p>
