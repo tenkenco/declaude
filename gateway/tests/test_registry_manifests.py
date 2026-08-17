@@ -62,3 +62,16 @@ def test_versions_are_semver():
     for doc in (SERVER, PLUGIN):
         parts = doc["version"].split(".")
         assert len(parts) == 3 and all(p.isdigit() for p in parts), doc["version"]
+
+
+def test_server_json_matches_what_is_actually_published():
+    """The registry already lists this server. If the file drifts from the live record, the next
+    publish silently rewrites a listing that is working — so keep them identical by construction.
+
+    Live record: https://registry.modelcontextprotocol.io/v0/servers?search=declaude
+    """
+    assert SERVER["title"] == "declaude"
+    assert SERVER["version"] == "1.0.0"
+    assert SERVER["$schema"].endswith("/2025-12-11/server.schema.json"), (
+        "published under the 2025-12-11 schema; bumping this file without republishing splits them"
+    )
