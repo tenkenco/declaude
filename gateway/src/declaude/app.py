@@ -6,6 +6,7 @@ import time
 from collections.abc import Callable
 from typing import Annotated
 from urllib.parse import parse_qs, urlencode
+from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import (
@@ -530,6 +531,55 @@ def create_app(
         key = generate_key()
         await usage.add_api_key(hash_key(key), grant.user_id)
         return {"access_token": key, "token_type": "Bearer", "scope": "translate"}
+
+    async def _clean_one(system: str, para: str) -> str:
+        """One paragraph re-translated for the guard, with the same output cleanup."""
+        return clean_output(para, await model.complete(system, para))
+
+    # ---- OpenAI-compatible surface ----
+
+    @app.post("/v1/chat/completions")
+    async def openai_chat_completions(request: Request, user_id: UserId, response: Response):
+        """Header-authenticated alternative to /api/chat.
+
+        The Ollama protocol carries no auth header, so clients pointed at it have to put the key
+        in the URL (https://x:KEY@host). Any tool that prints that URL — an error message, a log
+        line, a bug report — leaks the key. This surface takes an ordinary Bearer header instead.
+        """
+        body = await request.json()
+        messages = body.get("messages") or []
+        system = next((m.get("content", "") for m in messages if m.get("role") == "system"), SYSTEM_PROMPT)
+        prompt = next((m.get("content", "") for m in reversed(messages) if m.get("role") == "user"), "")
+        if not prompt.strip():
+            raise HTTPException(422, "no user message")
+        if len(prompt) > settings.max_input_chars:
+            raise HTTPException(422, f"text exceeds {settings.max_input_chars} characters")
+        free_tier = await check_quota(user_id)
+        try:
+            draft = clean_output(prompt, await model.complete(system, prompt))
+            content = await repair(prompt, draft, lambda para: _clean_one(system, para))
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(
+                503,
+                {"error": "model_unavailable", "message": "model backend is unavailable or warming up; retry shortly"},
+                headers={"Retry-After": "30"},
+            ) from exc
+        await record_usage(user_id, free_tier, response)
+        return {
+            "id": "chatcmpl-" + uuid4().hex,
+            "object": "chat.completion",
+            "created": int(time.time()),
+            "model": settings.model_name,
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": content},
+                    "finish_reason": "stop",
+                }
+            ],
+        }
 
     # ---- Ollama-compatible surface (claudish-to-english plugin & friends) ----
 
