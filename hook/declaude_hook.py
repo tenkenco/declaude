@@ -2,16 +2,16 @@
 """Claude Code hook: rewrite the assistant's messages from Claude-English into
 plain English via the hosted declaude service.
 
-Two install modes, same script (it dispatches on hook_event_name):
+One script, two install modes; it dispatches on hook_event_name:
 
-MessageDisplay (recommended) - the plain rendition appears inline under each
-reply as it is displayed, and nothing enters the model's context window:
-  {"hooks": {"MessageDisplay": [{"hooks": [{"type": "command",
-    "command": "python3 /path/to/declaude_hook.py", "timeout": 30}]}]}}
+  MessageDisplay (recommended) - the plain rendition appears inline under each
+  reply as it is displayed, and nothing enters the model's context window.
 
-Stop (fallback for Claude Code versions without MessageDisplay) - the plain
-rendition of the turn's final message is shown as a system message:
-  {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "python3 /path/to/declaude_hook.py"}]}]}}
+  Stop (fallback for Claude Code versions without MessageDisplay) - the plain
+  rendition of the turn's final message is shown as a system message.
+
+Install instructions live in hook/README.md (the single source; register only
+ONE of the two events).
 
 Env:
   DECLAUDE_TOKEN  - dk_ API key or session token (required)
@@ -19,23 +19,38 @@ Env:
 """
 from __future__ import annotations  # runs on end-user Pythons as old as 3.7
 
+import getpass
 import json
 import os
 import re
+import stat
 import sys
 import tempfile
+import time
 import urllib.error
 import urllib.request
 
 DEFAULT_URL = "https://speak-english.tenken.co"
 MIN_CHARS = 40  # don't burn a translation on one-liners
+# Claude Code dispatches up to 3 chunk invocations concurrently and fires the
+# final one immediately, so the final invocation may have to wait for earlier
+# chunks that are still in flight.
+CHUNK_WAIT_SECONDS = 3.0
+# Interrupted streams (Esc, crash, hook timeout) never deliver final=true, so
+# their chunk files would otherwise accumulate forever.
+STALE_AFTER_SECONDS = 3600
 
 
-def translate(text: str, *, token: str, base_url: str = DEFAULT_URL, timeout: int = 120) -> str:
+def translate(
+    text: str, *, token: str, base_url: str = DEFAULT_URL, timeout: int = 120
+) -> str:
     req = urllib.request.Request(
         f"{base_url}/v1/translate",
         data=json.dumps({"text": text}).encode(),
-        headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        },
         method="POST",
     )
     with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -46,7 +61,7 @@ def last_assistant_text(transcript_path: str) -> str | None:
     """Pull the final assistant message text from a Claude Code transcript (JSONL)."""
     last = None
     try:
-        with open(transcript_path) as f:
+        with open(transcript_path, encoding="utf-8", errors="replace") as f:
             for line in f:
                 try:
                     entry = json.loads(line)
@@ -54,7 +69,11 @@ def last_assistant_text(transcript_path: str) -> str | None:
                     continue
                 msg = entry.get("message") or {}
                 if msg.get("role") == "assistant":
-                    parts = [c.get("text", "") for c in msg.get("content", []) if c.get("type") == "text"]
+                    parts = [
+                        c.get("text", "")
+                        for c in msg.get("content", [])
+                        if c.get("type") == "text"
+                    ]
                     if any(parts):
                         last = "\n".join(p for p in parts if p)
     except OSError:
@@ -62,58 +81,185 @@ def last_assistant_text(transcript_path: str) -> str | None:
     return last
 
 
-def _buffer_path(payload: dict) -> str:
-    """Per-message chunk buffer. MessageDisplay fires once per streamed chunk,
-    each in a fresh process, so the accumulating text has to live on disk."""
-    key = "{}-{}".format(payload.get("session_id", ""), payload.get("message_id", ""))
-    key = re.sub(r"[^A-Za-z0-9-]", "_", key)
-    return os.path.join(tempfile.gettempdir(), "declaude-md-" + key)
-
-
-def _translate_or_none(text: str, token: str) -> str | None:
+def _user_key() -> str:
     try:
-        return translate(text, token=token, base_url=os.environ.get("DECLAUDE_URL", DEFAULT_URL), timeout=25)
+        return str(os.getuid())
+    except AttributeError:  # Windows
+        return re.sub(r"[^A-Za-z0-9-]", "_", getpass.getuser())
+
+
+def _buffer_dir() -> str | None:
+    """Private per-user directory for chunk buffers.
+
+    The system temp dir is world-writable on multi-user hosts, so buffered
+    assistant text must not sit there under a predictable world-readable name.
+    The directory must be ours alone (0700, a real directory we own) or we
+    refuse to buffer at all.
+    """
+    d = os.path.join(tempfile.gettempdir(), "declaude-" + _user_key())
+    try:
+        os.mkdir(d, 0o700)
+    except FileExistsError:
+        pass
+    except OSError:
+        return None
+    try:
+        st = os.lstat(d)
+    except OSError:
+        return None
+    if not stat.S_ISDIR(st.st_mode):
+        return None
+    if hasattr(os, "getuid") and st.st_uid != os.getuid():
+        return None
+    return d
+
+
+def _sweep_stale(buffer_dir: str) -> None:
+    cutoff = time.time() - STALE_AFTER_SECONDS
+    try:
+        names = os.listdir(buffer_dir)
+    except OSError:
+        return
+    for name in names:
+        path = os.path.join(buffer_dir, name)
+        try:
+            if os.lstat(path).st_mtime < cutoff:
+                os.unlink(path)
+        except OSError:
+            pass
+
+
+def _chunk_path(buffer_dir: str, key: str, index: int) -> str:
+    return os.path.join(buffer_dir, "{}.{}".format(key, index))
+
+
+def _write_chunk(buffer_dir: str, key: str, index: int, delta: str) -> None:
+    """Write one chunk to its own file, atomically.
+
+    Write-then-rename means a chunk file only ever appears complete, so the
+    final invocation can treat existence as done. O_EXCL on the scratch file
+    refuses to follow a planted symlink; 0600 keeps the text private.
+    """
+    scratch = os.path.join(buffer_dir, "{}.{}.part{}".format(key, index, os.getpid()))
+    fd = os.open(scratch, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(delta)
+    os.replace(scratch, _chunk_path(buffer_dir, key, index))
+
+
+def _collect_chunks(buffer_dir: str, key: str, final_index: int) -> str | None:
+    """Assemble chunks 0..final_index-1 in index order, waiting briefly for
+    invocations still in flight. None if any chunk never lands (fail open)."""
+    want = list(range(final_index))
+    deadline = time.monotonic() + CHUNK_WAIT_SECONDS
+    while any(not os.path.exists(_chunk_path(buffer_dir, key, i)) for i in want):
+        if time.monotonic() >= deadline:
+            return None
+        time.sleep(0.05)
+    parts = []
+    for i in want:
+        with open(_chunk_path(buffer_dir, key, i), encoding="utf-8") as f:
+            parts.append(f.read())
+    return "".join(parts)
+
+
+def _cleanup_chunks(buffer_dir: str, key: str, final_index: int) -> None:
+    for i in range(final_index):
+        try:
+            os.unlink(_chunk_path(buffer_dir, key, i))
+        except OSError:
+            pass
+
+
+def _plain_rendition(text: str, token: str, timeout: int) -> str | None:
+    """Shared gate for both modes: skip short messages, translate, and drop
+    renditions that add nothing. Any failure degrades gracefully to None."""
+    if len(text) < MIN_CHARS:
+        return None
+    try:
+        plain = translate(
+            text,
+            token=token,
+            base_url=os.environ.get("DECLAUDE_URL", DEFAULT_URL),
+            timeout=timeout,
+        )
     except urllib.error.HTTPError as e:
         if e.code == 402:
-            print("declaude: free tier exhausted — upgrade via the payment link in the 402 response", file=sys.stderr)
+            print(
+                "declaude: free tier exhausted — upgrade via the payment link"
+                " in the 402 response",
+                file=sys.stderr,
+            )
         return None  # degrade gracefully: never break the user's session
     except Exception:
         return None
+    if not plain.strip() or plain.strip() == text.strip():
+        return None
+    return plain
 
 
 def handle_message_display(payload: dict, token: str) -> int:
-    """Buffer chunks; on the final one, attach the plain rendition via displayContent.
-    Emitting nothing leaves the original chunk displayed as-is (fail open)."""
+    """Buffer chunks; on the final one, attach the plain rendition via
+    displayContent. Emitting nothing leaves the original displayed (fail open).
+
+    MessageDisplay is undocumented and its payload shape may drift between
+    Claude Code versions, so anything unexpected means do nothing rather than
+    guess."""
     delta = payload.get("delta") or ""
-    path = _buffer_path(payload)
+    session_id = payload.get("session_id")
+    message_id = payload.get("message_id")
+    index = payload.get("index")
+    if (
+        not session_id
+        or not message_id
+        or isinstance(index, bool)
+        or not isinstance(index, int)
+        or index < 0
+    ):
+        return 0
+    key = re.sub(r"[^A-Za-z0-9-]", "_", "{}-{}".format(session_id, message_id))
+    buffer_dir = _buffer_dir()
+    if buffer_dir is None:
+        return 0
     try:
-        with open(path, "a") as f:
-            f.write(delta)
         if not payload.get("final"):
+            _write_chunk(buffer_dir, key, index, delta)
             return 0
-        with open(path) as f:
-            text = f.read()
-        os.unlink(path)
-    except OSError:
+        _sweep_stale(buffer_dir)
+        earlier = _collect_chunks(buffer_dir, key, index)
+        _cleanup_chunks(buffer_dir, key, index)
+    except (OSError, ValueError):
         return 0
-    if len(text) < MIN_CHARS:
+    if earlier is None:
         return 0
-    plain = _translate_or_none(text, token)
-    if plain is None or plain.strip() == text.strip():
+    plain = _plain_rendition(earlier + delta, token, timeout=25)
+    if plain is None:
         return 0
     out = f"{delta}\n\n[declaude] plain English:\n\n{plain}"
-    print(json.dumps({"hookSpecificOutput": {"hookEventName": "MessageDisplay", "displayContent": out}}))
+    print(
+        json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "MessageDisplay",
+                    "displayContent": out,
+                }
+            }
+        )
+    )
     return 0
 
 
 def handle_stop(payload: dict, token: str) -> int:
     text = last_assistant_text(payload.get("transcript_path", ""))
-    if not text or len(text) < MIN_CHARS:
+    if not text:
         return 0
-    plain = _translate_or_none(text, token)
+    # Stop is not on the display path, so it can afford to ride out a cold GPU.
+    plain = _plain_rendition(text, token, timeout=120)
     if plain is None:
         return 0
-    print(json.dumps({"systemMessage": f"[declaude] plain-English version:\n\n{plain}"}))
+    print(
+        json.dumps({"systemMessage": f"[declaude] plain-English version:\n\n{plain}"})
+    )
     return 0
 
 

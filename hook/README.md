@@ -37,8 +37,13 @@ so on errors or older versions the original text displays unchanged.
 Set `timeout: 30` explicitly. The event's default timeout is 10 seconds, which
 a cold GPU (spot reclaim) can miss.
 
-Messages under 40 characters are skipped, and a rewrite identical to the
-original is dropped, so quota is only spent where it helps.
+Messages under 40 characters are skipped before the service is called, so they
+cost no quota. A rendition that comes back empty or identical to the original
+is dropped rather than displayed (that call is still billed).
+
+While a reply streams, chunks are buffered in a private per-user directory
+(`declaude-<uid>`, mode 0700, files 0600) under the system temp dir. Buffers
+from interrupted streams are swept after an hour.
 
 ## Install (Stop fallback)
 
@@ -49,6 +54,10 @@ system message after the turn instead of inline:
 ```json
 {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "python3 /path/to/declaude_hook.py"}]}]}}
 ```
+
+Register only ONE of the two events. With both registered on a current Claude
+Code, each reply is translated twice and billed twice. If you upgrade from the
+old Stop install, remove the `Stop` entry when you add `MessageDisplay`.
 
 Both modes fail open: if the service or your quota is unavailable, your
 session is never blocked.

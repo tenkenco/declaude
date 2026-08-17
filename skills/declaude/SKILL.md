@@ -63,38 +63,19 @@ The hook rewrites replies at display time on our GPU. Your transcript, context w
 token bill are untouched, so it costs **zero Claude tokens**.
 
 Recommended install uses the `MessageDisplay` hook event: Claude Code streams each reply to
-the hook in chunks (`message_id`, `index`, `delta`, `final: true` on the last one), and the
-hook's `displayContent` reply is rendered in the terminal in place of the chunk. The plain
-rendition appears inline directly under each reply, and nothing is written into the model's
-context. The event is present in current Claude Code but undocumented, so the hook fails
-open: on any error, or on versions without the event, the original text displays unchanged.
+the hook in chunks (`session_id`, `message_id`, `index`, `delta`, `final: true` on the last
+one), and the hook's `displayContent` reply is rendered in the terminal in place of the final
+chunk. The plain rendition appears inline directly under each reply, and nothing is written
+into the model's context. The event is present in current Claude Code but undocumented, so
+the hook fails open: on any error, or on versions without the event, the original text
+displays unchanged.
 
-1. Get a `dk_` key at [/signin](https://speak-english.tenken.co/signin) and
-   `export DECLAUDE_TOKEN=<key>` in your shell profile.
-2. Download [`declaude_hook.py`](https://github.com/tenkenco/declaude/blob/main/hook/declaude_hook.py)
-   and add to `~/.claude/settings.json`:
-
-```json
-{
-  "hooks": {
-    "MessageDisplay": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 /path/to/declaude_hook.py",
-            "timeout": 30
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-Set `timeout: 30` explicitly: the event's default is 10 s, which a cold GPU can miss. On
-Claude Code versions without `MessageDisplay`, register the same script under `"Stop"`
-instead; the rendition then arrives as a system message after each turn rather than inline.
+Install steps, the settings.json snippets for both the `MessageDisplay` and fallback `Stop`
+registrations, and the timeout guidance live in
+[`hook/README.md`](https://github.com/tenkenco/declaude/blob/main/hook/README.md); that file
+is the single source for install instructions. Register only ONE of the two events, and
+remove any old `Stop` entry when adding `MessageDisplay`, or every reply is translated and
+billed twice.
 
 Alternative: the [claudish-to-english](https://github.com/gvzdv/claudish-to-english) plugin
 (which pioneered this hook) can point at declaude instead of local Ollama:
