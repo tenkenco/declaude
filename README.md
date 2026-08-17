@@ -60,6 +60,7 @@ token. That is the whole setup.
 | **Claude Code hook** | Rewrites replies as they render, costs zero Claude tokens | [hook/](hook/) |
 | **Documents** | Drop a `.md`/`.txt`, get it back rewritten | [web](https://speak-english.tenken.co/documents) |
 | **REST API** | `POST /v1/translate`, `/v1/documents`, `/v1/usage` | [skill](skills/declaude/SKILL.md#rest-api) |
+| **OpenAI-compatible** | `POST /v1/chat/completions` — point any OpenAI client at `/v1` | [skill](skills/declaude/SKILL.md#rest-api) |
 
 Full usage, authentication and quota behaviour live in
 **[skills/declaude/SKILL.md](skills/declaude/SKILL.md)** — installable as an agent skill, so
