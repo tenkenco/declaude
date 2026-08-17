@@ -1,13 +1,13 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
   "name": "io.github.tenkenco/declaude",
-  "title": "declaude",
-  "description": "Rewrites Claude-English into plain English, preserving meaning, code and structure.",
+  "description": "Rewrites AI-assistant writing tics into plain English, preserving facts, code, names and numbers.",
   "version": "1.0.0",
   "websiteUrl": "https://speak-english.tenken.co",
   "repository": {
     "url": "https://github.com/tenkenco/declaude",
-    "source": "github"
+    "source": "github",
+    "id": "1331597720"
   },
   "remotes": [
     {

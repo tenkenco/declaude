@@ -1,0 +1,16 @@
+{
+  "name": "tenken",
+  "owner": {
+    "name": "Tenken",
+    "url": "https://www.tenken.co"
+  },
+  "description": "Tenken's Claude Code plugins.",
+  "plugins": [
+    {
+      "name": "declaude",
+      "source": "./",
+      "description": "Rewrites Claude-English into plain English. Adds a skill your agent can call on any draft, README or message.",
+      "category": "productivity"
+    }
+  ]
+}
