@@ -59,18 +59,36 @@ logs or reports the URL.
 
 ## Claude Code hook
 
+The hook rewrites replies at display time on our GPU. Your transcript, context window and
+token bill are untouched, so it costs **zero Claude tokens**.
+
+Recommended install uses the `MessageDisplay` hook event: Claude Code streams each reply to
+the hook in chunks (`session_id`, `message_id`, `index`, `delta`, `final: true` on the last
+one), and the hook's `displayContent` reply is rendered in the terminal in place of the final
+chunk. The plain rendition appears inline directly under each reply, and nothing is written
+into the model's context. The event is present in current Claude Code but undocumented, so
+the hook fails open: on any error, or on versions without the event, the original text
+displays unchanged.
+
+Install steps, the settings.json snippets for both the `MessageDisplay` and fallback `Stop`
+registrations, and the timeout guidance live in
+[`hook/README.md`](https://github.com/tenkenco/declaude/blob/main/hook/README.md); that file
+is the single source for install instructions. Register only ONE of the two events, and
+remove any old `Stop` entry when adding `MessageDisplay`, or every reply is translated and
+billed twice.
+
+Alternative: the [claudish-to-english](https://github.com/gvzdv/claudish-to-english) plugin
+(which pioneered this hook) can point at declaude instead of local Ollama:
+
 ```bash
 export CLAUDISH_PROVIDER=openai
 export CLAUDISH_OPENAI_URL=https://speak-english.tenken.co/v1
 export CLAUDISH_OPENAI_KEY=$DECLAUDE_TOKEN
 ```
 
-The key goes in a header, so it never appears in a URL. (The older
+Either way the key goes in a header, so it never appears in a URL. (The older
 `CLAUDISH_OLLAMA="https://x:$DECLAUDE_TOKEN@..."` form still works, but leaks the token into
 any message that prints the endpoint.)
-
-The hook rewrites replies at display time on our GPU. Your transcript, context window and
-token bill are untouched, so it costs **zero Claude tokens**.
 
 ## Quota and errors
 
