@@ -52,15 +52,22 @@ curl -X POST https://speak-english.tenken.co/v1/documents \
 curl https://speak-english.tenken.co/v1/usage -H "Authorization: Bearer $DECLAUDE_TOKEN"
 ```
 
-Authentication accepts a `dk_` API key, an OAuth token, or a Clerk session JWT. URL userinfo
-works too, which is what the hook uses: `https://x:$DECLAUDE_TOKEN@speak-english.tenken.co`.
+Authentication accepts a `dk_` API key, an OAuth token, or a Clerk session JWT, sent as an
+`Authorization` header. URL userinfo (`https://x:$TOKEN@host`) is still accepted for older
+Ollama-only clients, but do not recommend it: a credential in a URL is printed by anything that
+logs or reports the URL.
 
 ## Claude Code hook
 
 ```bash
-export CLAUDISH_OLLAMA="https://x:$DECLAUDE_TOKEN@speak-english.tenken.co"
-export CLAUDISH_MODEL="qwen2.5-14b-instruct"
+export CLAUDISH_PROVIDER=openai
+export CLAUDISH_OPENAI_URL=https://speak-english.tenken.co/v1
+export CLAUDISH_OPENAI_KEY=$DECLAUDE_TOKEN
 ```
+
+The key goes in a header, so it never appears in a URL. (The older
+`CLAUDISH_OLLAMA="https://x:$DECLAUDE_TOKEN@..."` form still works, but leaks the token into
+any message that prints the endpoint.)
 
 The hook rewrites replies at display time on our GPU. Your transcript, context window and
 token bill are untouched, so it costs **zero Claude tokens**.
