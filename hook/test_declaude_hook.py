@@ -188,6 +188,8 @@ def test_message_display_rejects_drifted_payload(buffer_home, capsys):
         {"index": "3"},
         {"index": -1},
         {"index": True},
+        {"delta": 123},
+        {"delta": ["chunks"]},
     ):
         payload = _md_payload("x" * 50, index=0, final=True)
         payload.update(bad)
@@ -276,6 +278,15 @@ def test_buffer_dir_refuses_foreign_directory(buffer_home, capsys, monkeypatch):
     )
     assert capsys.readouterr().out == ""
     assert not any(buffer_home.iterdir())
+
+
+@pytest.mark.skipif(not POSIX, reason="POSIX permission bits")
+def test_buffer_dir_tightens_loose_permissions(buffer_home):
+    """A pre-existing dir with broader perms is chmodded back to 0700."""
+    buffer_home.mkdir(mode=0o775)
+    dh.handle_message_display(_md_payload("x" * 50, index=0, final=False), "tok")
+    assert stat.S_IMODE(os.stat(buffer_home).st_mode) == 0o700
+    assert _chunk_file(buffer_home, 0).exists()
 
 
 def _stop_payload(tmp_path, text):

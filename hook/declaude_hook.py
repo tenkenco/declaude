@@ -109,8 +109,16 @@ def _buffer_dir() -> str | None:
         return None
     if not stat.S_ISDIR(st.st_mode):
         return None
-    if hasattr(os, "getuid") and st.st_uid != os.getuid():
-        return None
+    if hasattr(os, "getuid"):
+        if st.st_uid != os.getuid():
+            return None
+        # A pre-existing dir may have been created looser (old version, umask);
+        # 0700 is part of the contract, so tighten it or refuse to buffer.
+        if stat.S_IMODE(st.st_mode) != 0o700:
+            try:
+                os.chmod(d, 0o700)
+            except OSError:
+                return None
     return d
 
 
@@ -205,12 +213,15 @@ def handle_message_display(payload: dict, token: str) -> int:
     MessageDisplay is undocumented and its payload shape may drift between
     Claude Code versions, so anything unexpected means do nothing rather than
     guess."""
-    delta = payload.get("delta") or ""
+    delta = payload.get("delta")
+    if delta is None:
+        delta = ""
     session_id = payload.get("session_id")
     message_id = payload.get("message_id")
     index = payload.get("index")
     if (
-        not session_id
+        not isinstance(delta, str)
+        or not session_id
         or not message_id
         or isinstance(index, bool)
         or not isinstance(index, int)
