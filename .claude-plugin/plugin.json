@@ -1,7 +1,7 @@
 {
   "name": "declaude",
   "description": "Rewrites Claude-English into plain English: sycophantic openers, hedging filler and padded phrasing out, facts, code blocks, names and numbers untouched. Runs an open-weights model on dedicated GPUs, so text never reaches a commercial AI provider.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": {
     "name": "Tenken",
     "url": "https://www.tenken.co"
@@ -13,14 +13,13 @@
     "api_key": {
       "type": "string",
       "title": "API key",
-      "description": "A dk_ key from speak-english.tenken.co/signin.",
+      "description": "Paste a dk_ key from speak-english.tenken.co/signin. The hook needs this key to rewrite replies, and it stays silent without one. The MCP tools sign in separately and do not need it.",
       "sensitive": true
     },
     "hook_enabled": {
       "type": "boolean",
       "title": "Enable automatic rewrites",
-      "description": "Enable only after removing any manual declaude hook. Successful rewrites count against your quota.",
-      "default": false
+      "description": "Enter true or false. An unset value enables automatic rewrites. Set it to false to stop them. Each rewrite counts against your quota. Set it to false if you still run a manual declaude hook, because two hooks bill you twice."
     }
   },
   "keywords": [

@@ -6,6 +6,8 @@ import os
 import stat
 import sys
 import time
+import urllib.error
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -14,9 +16,13 @@ import declaude_hook as dh
 POSIX = hasattr(os, "getuid")
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def buffer_home(monkeypatch, tmp_path):
-    """Point the hook's buffer directory under tmp_path and return it."""
+    """Point the hook's buffer directory under tmp_path and return it.
+
+    Autouse: handle_stop touches the buffer directory too, so a test without
+    this fixture would write a real marker into the developer's temp directory
+    and poison every later run."""
     monkeypatch.setattr(dh.tempfile, "gettempdir", lambda: str(tmp_path))
     return tmp_path / ("declaude-" + dh._user_key())
 
@@ -77,7 +83,7 @@ def test_main_never_raises_on_bad_stdin(monkeypatch):
     assert dh.main() == 0
 
 
-def test_plugin_invocation_is_inert_until_explicitly_enabled(monkeypatch, capsys):
+def test_plugin_invocation_is_inert_for_legacy_token_users(monkeypatch, capsys):
     """An automatic plugin update must not activate a second paid hook for users
     who still have the old manual registration."""
     monkeypatch.setenv("DECLAUDE_TOKEN", "x")
@@ -92,6 +98,50 @@ def test_plugin_invocation_is_inert_until_explicitly_enabled(monkeypatch, capsys
         dh,
         "handle_message_display",
         lambda *args: pytest.fail("plugin hook must stay inert before opt-in"),
+    )
+
+    assert dh.main() == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_plugin_invocation_runs_by_default(monkeypatch):
+    """A fresh install rewrites replies without any configuration step."""
+    monkeypatch.delenv("DECLAUDE_TOKEN", raising=False)
+    monkeypatch.delenv("CLAUDE_PLUGIN_OPTION_HOOK_ENABLED", raising=False)
+    monkeypatch.setenv("CLAUDE_PLUGIN_OPTION_API_KEY", "x")
+    monkeypatch.setattr(sys, "argv", ["declaude_hook.py", "--plugin"])
+    monkeypatch.setattr(
+        sys,
+        "stdin",
+        io.StringIO(json.dumps(_md_payload("x" * 80, index=0, final=True))),
+    )
+    seen = {}
+
+    def handle(payload, token):
+        seen["token"] = token
+        return 0
+
+    monkeypatch.setattr(dh, "handle_message_display", handle)
+
+    assert dh.main() == 0
+    assert seen["token"] == "x"
+
+
+@pytest.mark.parametrize("value", ["false", "False", "0", "no", "off", " false "])
+def test_plugin_invocation_stops_on_explicit_false(monkeypatch, capsys, value):
+    monkeypatch.delenv("DECLAUDE_TOKEN", raising=False)
+    monkeypatch.setenv("CLAUDE_PLUGIN_OPTION_HOOK_ENABLED", value)
+    monkeypatch.setenv("CLAUDE_PLUGIN_OPTION_API_KEY", "x")
+    monkeypatch.setattr(sys, "argv", ["declaude_hook.py", "--plugin"])
+    monkeypatch.setattr(
+        sys,
+        "stdin",
+        io.StringIO(json.dumps(_md_payload("x" * 80, index=0, final=True))),
+    )
+    monkeypatch.setattr(
+        dh,
+        "handle_message_display",
+        lambda *args: pytest.fail("an explicit false must keep the hook inert"),
     )
 
     assert dh.main() == 0
@@ -189,6 +239,7 @@ def test_message_display_translates_full_message_on_final(
     assert out["hookSpecificOutput"]["hookEventName"] == "MessageDisplay"
     assert dc.startswith(long_b)  # final chunk's own text is preserved
     assert "plain version" in dc
+    assert dh.LABEL in dc  # the rendition carries its own marker
     assert not _chunk_file(buffer_home, 0).exists()  # buffer cleaned up
 
 
@@ -246,8 +297,7 @@ def test_message_display_waits_for_in_flight_chunk(buffer_home, capsys, monkeypa
 
 
 def test_message_display_rejects_drifted_payload(buffer_home, capsys):
-    """The event is undocumented; a missing/renamed field must not collapse
-    every message onto one shared buffer key."""
+    """A missing or renamed field must not collapse messages onto one key."""
     for bad in (
         {"message_id": None},
         {"session_id": None},
@@ -383,7 +433,9 @@ def test_stop_translates_with_long_timeout(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr(dh, "translate", fake_translate)
     assert dh.handle_stop(_stop_payload(tmp_path, "x" * 80), "tok") == 0
     assert seen["timeout"] == 120
-    assert "plain version" in json.loads(capsys.readouterr().out)["systemMessage"]
+    message = json.loads(capsys.readouterr().out)["systemMessage"]
+    assert "plain version" in message
+    assert message.startswith(dh.LABEL)
 
 
 def test_stop_drops_identical_rewrite(tmp_path, capsys, monkeypatch):
@@ -396,3 +448,173 @@ def test_empty_translation_is_dropped(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr(dh, "translate", lambda text, **k: "   ")
     assert dh.handle_stop(_stop_payload(tmp_path, "x" * 80), "tok") == 0
     assert capsys.readouterr().out == ""
+
+
+def _http_402(body=b'{"upgrade_url": "https://example.test/upgrade"}'):
+    return urllib.error.HTTPError(
+        "https://speak-english.tenken.co/v1/translate",
+        402,
+        "Payment Required",
+        {},
+        io.BytesIO(body),
+    )
+
+
+def test_message_display_says_when_the_quota_ran_out(buffer_home, capsys, monkeypatch):
+    """Every reply costs a translation, so a silent stop reads as a broken plugin."""
+
+    def refuse(text, **kwargs):
+        raise _http_402()
+
+    monkeypatch.setattr(dh, "translate", refuse)
+    assert (
+        dh.handle_message_display(_md_payload("x" * 80, index=0, final=True), "tok")
+        == 0
+    )
+    dc = json.loads(capsys.readouterr().out)["hookSpecificOutput"]["displayContent"]
+    assert "monthly translation limit reached" in dc
+    assert "https://example.test/upgrade" in dc
+    assert "plain English:" not in dc, "a notice must not pose as a rewrite"
+
+
+def test_quota_notice_survives_a_body_it_cannot_read(buffer_home, capsys, monkeypatch):
+    def refuse(text, **kwargs):
+        raise _http_402(b"not json")
+
+    monkeypatch.setattr(dh, "translate", refuse)
+    assert (
+        dh.handle_message_display(_md_payload("x" * 80, index=0, final=True), "tok")
+        == 0
+    )
+    dc = json.loads(capsys.readouterr().out)["hookSpecificOutput"]["displayContent"]
+    assert "monthly translation limit reached" in dc
+    assert "Upgrade:" not in dc
+
+
+def test_stop_says_when_the_quota_ran_out(tmp_path, capsys, monkeypatch):
+    def refuse(text, **kwargs):
+        raise _http_402()
+
+    monkeypatch.setattr(dh, "translate", refuse)
+    assert dh.handle_stop(_stop_payload(tmp_path, "x" * 80), "tok") == 0
+    message = json.loads(capsys.readouterr().out)["systemMessage"]
+    assert message.startswith(dh.LABEL)
+    assert "monthly translation limit reached" in message
+    assert "plain English:" not in message
+
+
+def test_other_http_errors_stay_silent(buffer_home, capsys, monkeypatch):
+    """Only an exhausted quota is worth interrupting the reply for."""
+
+    def refuse(text, **kwargs):
+        raise urllib.error.HTTPError("u", 401, "Unauthorized", {}, io.BytesIO(b""))
+
+    monkeypatch.setattr(dh, "translate", refuse)
+    assert (
+        dh.handle_message_display(_md_payload("x" * 80, index=0, final=True), "tok")
+        == 0
+    )
+    assert capsys.readouterr().out == ""
+
+
+def test_quota_notice_shows_once_and_stops_calling(buffer_home, capsys, monkeypatch):
+    """The same 402 on every reply is noise, and each one costs a request."""
+    calls = []
+
+    def refuse(text, **kwargs):
+        calls.append(text)
+        raise _http_402()
+
+    monkeypatch.setattr(dh, "translate", refuse)
+
+    first = _md_payload("x" * 80, index=0, final=True, message_id="m-a")
+    assert dh.handle_message_display(first, "tok") == 0
+    assert "monthly translation limit reached" in capsys.readouterr().out
+    assert len(calls) == 1
+
+    second = _md_payload("y" * 80, index=0, final=True, message_id="m-b")
+    assert dh.handle_message_display(second, "tok") == 0
+    assert capsys.readouterr().out == "", "the notice must not repeat"
+    assert len(calls) == 1, "a held quota must not cost another request"
+    assert (buffer_home / dh.QUOTA_MARKER).exists()
+
+
+def test_quota_hold_expires_so_an_upgrade_takes_effect(
+    buffer_home, capsys, monkeypatch
+):
+    """_sweep_stale expires the marker, so a paid upgrade needs no restart."""
+
+    def refuse(text, **kwargs):
+        raise _http_402()
+
+    monkeypatch.setattr(dh, "translate", refuse)
+    assert (
+        dh.handle_message_display(_md_payload("x" * 80, index=0, final=True), "tok")
+        == 0
+    )
+    capsys.readouterr()
+    marker = buffer_home / dh.QUOTA_MARKER
+    assert marker.exists()
+
+    stale = time.time() - dh.STALE_AFTER_SECONDS - 60
+    os.utime(marker, (stale, stale))
+
+    monkeypatch.setattr(dh, "translate", lambda text, **k: "plain version")
+    assert (
+        dh.handle_message_display(
+            _md_payload("z" * 80, index=0, final=True, message_id="m-c"), "tok"
+        )
+        == 0
+    )
+    dc = json.loads(capsys.readouterr().out)["hookSpecificOutput"]["displayContent"]
+    assert "plain version" in dc
+    assert not marker.exists(), "the stale marker must be swept"
+
+
+def test_stop_quota_hold_expires_so_an_upgrade_takes_effect(
+    tmp_path, buffer_home, capsys, monkeypatch
+):
+    def refuse(text, **kwargs):
+        raise _http_402()
+
+    payload = _stop_payload(tmp_path, "x" * 80)
+    monkeypatch.setattr(dh, "translate", refuse)
+    assert dh.handle_stop(payload, "tok") == 0
+    capsys.readouterr()
+
+    marker = buffer_home / dh.QUOTA_MARKER
+    stale = time.time() - dh.STALE_AFTER_SECONDS - 60
+    os.utime(marker, (stale, stale))
+
+    calls = []
+    monkeypatch.setattr(
+        dh, "translate", lambda text, **k: calls.append(text) or "plain version"
+    )
+    assert dh.handle_stop(payload, "tok") == 0
+    assert calls == ["x" * 80]
+    assert "plain version" in capsys.readouterr().out
+    assert not marker.exists()
+
+
+def test_concurrent_quota_notices_have_one_winner(buffer_home):
+    buffer_dir = dh._buffer_dir()
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(lambda _: dh._note_quota(buffer_dir), range(8)))
+    assert results.count(True) == 1
+    assert results.count(False) == 7
+
+
+def test_stop_quota_notice_shows_once(tmp_path, buffer_home, capsys, monkeypatch):
+    calls = []
+
+    def refuse(text, **kwargs):
+        calls.append(text)
+        raise _http_402()
+
+    monkeypatch.setattr(dh, "translate", refuse)
+    assert dh.handle_stop(_stop_payload(tmp_path, "x" * 80), "tok") == 0
+    assert "monthly translation limit reached" in capsys.readouterr().out
+
+    assert dh.handle_stop(_stop_payload(tmp_path, "y" * 80), "tok") == 0
+    assert capsys.readouterr().out == ""
+    assert len(calls) == 1

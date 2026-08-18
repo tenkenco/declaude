@@ -15,20 +15,50 @@ want the plugin.
 
 The plugin ships `hooks/hooks.json` at its root, and Claude Code loads that file
 on install. It registers the `MessageDisplay` event and points at
-`hook/declaude_hook.py` inside the plugin, with a 30 second timeout. The plugin
-invocation stays inert until its `hook_enabled` configuration option is true.
+`hook/declaude_hook.py` inside the plugin, with a 30 second timeout.
 
-Run `/declaude:setup`. It performs the migration in a safe order:
+An unset `hook_enabled` option means on. So a fresh install rewrites replies as
+soon as you set an `api_key`. The manifest declares no default because Claude
+Code's documented behavior is to export declared defaults to plugin processes.
+Keeping the default in the hook preserves the version 1.0 migration guard. The
+key stays optional because the MCP tools sign in on their own and do not need it.
+
+New install:
 
 1. Get a `dk_` key at [/signin](https://speak-english.tenken.co/signin).
-2. Remove any old manual hook entry.
-3. Run `/plugin configure declaude@tenken`, enter the key in the masked
-   `api_key` field, and set `hook_enabled` to true.
+2. Run `/plugin configure declaude@tenken` and paste the key in the masked
+   `api_key` field.
+3. Run `/reload-plugins`, as the configuration dialog instructs.
+
+The hook prints nothing when it has no key. So run `/declaude:setup` if no
+rendition appears.
+
+Upgrade from version 1.0: run `/declaude:setup` instead. It removes any manual
+hook entry first, because a manual entry plus the plugin bills you twice.
+
+The `hook_enabled` field takes `true` or `false`. Type `false` to stop automatic
+rewrites.
+
+The hook carries one more guard for version 1.0 users. It stays inert when you
+export `DECLAUDE_TOKEN` and Claude Code passes no value for `hook_enabled`. So
+run `/declaude:setup` when you upgrade, and remove the manual hook yourself.
+
+Claude Code 2.1.234 omitted an unset option from the hook environment in a local
+probe on 2026-08-18. The manifest deliberately declares no default, so an unset
+option remains distinct from an explicit `true` even if Claude Code changes how
+it exports declared defaults. The hook treats the empty value as on.
+
+The hook stays quiet about most failures, so a bad network never breaks a
+session. It speaks up for one case. An exhausted monthly quota shows a notice
+with the upgrade link. It shows that notice once, then records the answer and
+skips both the notice and the request. The record expires after an hour, so a
+paid upgrade takes effect without a restart.
 
 Claude Code stores `api_key` in secure storage rather than `settings.json`. The
 plugin hook exits silently while disabled or while neither the secure key nor
-`DECLAUDE_TOKEN` exists. A manual hook still uses `DECLAUDE_TOKEN`, so existing
-version 1.0 setups keep working until the user deliberately migrates them.
+`DECLAUDE_TOKEN` exists. So a missing key produces no error and no rewrite. A
+manual hook still uses `DECLAUDE_TOKEN`, so existing version 1.0 setups keep
+working until the user deliberately migrates them.
 
 If you already registered this hook by hand, remove that entry now. A manual
 entry plus the plugin translates every reply twice and bills you twice. Claude
@@ -51,9 +81,9 @@ with `python` or the `py` launcher in the command.
 The `MessageDisplay` event streams each assistant reply to the hook in chunks
 and renders the hook's `displayContent` reply in the terminal. The plain-English
 rendition appears inline directly under each reply, at display time only:
-nothing enters the model's context window, so it costs zero Claude tokens. Older
-Claude Code versions lack the event; the hook fails open, so on errors or older
-versions the original text displays unchanged.
+nothing enters the model's context window, so it costs zero Claude tokens. The
+event is part of the current Claude Code hooks reference. Older Claude Code
+versions lack it; the hook fails open, so the original text displays unchanged.
 
 1. Get a `dk_` key at the declaude landing page ([/signin](https://speak-english.tenken.co/signin)).
 2. `export DECLAUDE_TOKEN=<key>` in your shell profile.

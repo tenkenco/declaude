@@ -6,9 +6,14 @@ description: Finish declaude setup after installing the plugin. Use when the pla
 # declaude setup
 
 The plugin already registers the Claude Code hook. It ships `hooks/hooks.json`, which
-Claude Code loads on install. Its `hook_enabled` option defaults to false. This protects
-users upgrading from version 1.0, whose manual hook may still be registered, from
-translating and billing every reply twice.
+Claude Code loads on install. An unset `hook_enabled` option means on, so a fresh
+install rewrites replies after its API key is configured. The manifest does not declare
+a default because Claude Code may export declared defaults to plugin processes. The
+`api_key` option stays optional because the MCP tools sign in on their own.
+
+One case still stays inert. A user who exports `DECLAUDE_TOKEN` and never sets
+`hook_enabled` keeps the plugin hook off. That user may still run a version 1.0 manual
+hook, and two hooks would translate and bill every reply twice.
 
 Work through the steps below in order. Report the result of each one.
 
@@ -51,12 +56,14 @@ Only after every manual entry is removed, run:
 
 Set the options in the configuration dialog:
 
-- `api_key`: if a key is already stored, do not edit or replace it. Existing
-  `DECLAUDE_TOKEN` users may leave this empty because the plugin falls back to that
-  environment variable. If both locations are empty, cancel the dialog, get a `dk_` key at
-  [/signin](https://speak-english.tenken.co/signin), reopen the dialog, and enter the key in
-  this masked field. Do not paste it into the chat.
-- `hook_enabled`: set to true only after a key is available.
+- `api_key`: if a key is already stored, do not edit or replace it. Otherwise get a `dk_`
+  key at [/signin](https://speak-english.tenken.co/signin) and enter it in this masked
+  field. Do not paste it into the chat. Existing `DECLAUDE_TOKEN` users may leave this
+  empty, because the hook falls back to that environment variable.
+- `hook_enabled`: type `true` or `false` in this field. An unset value means on. Type
+  `false` to stop automatic rewrites. Type `true` if the user exports `DECLAUDE_TOKEN` and
+  wants the plugin hook on. The hook exits silently when it has no key, so a missing key
+  produces no error message.
 
 Claude Code stores `api_key` in secure storage and exports it only to the plugin process as
 `CLAUDE_PLUGIN_OPTION_API_KEY`. It stores the Boolean opt-in in user settings. Project files
@@ -79,7 +86,7 @@ secure plugin values are deliberately unavailable to the shell.
 
 The hook itself is proven only in a session. Ask the user to start a new Claude Code
 session and send any prompt. A reply longer than 40 characters shows a
-`[declaude] plain English:` block under it.
+`🧼 declaude plain English:` block under it.
 
 ## If nothing appears
 

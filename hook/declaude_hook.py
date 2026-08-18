@@ -15,10 +15,11 @@ ONE of the two events).
 
 Env:
   CLAUDE_PLUGIN_OPTION_API_KEY - secure plugin-config key (plugin install)
-  CLAUDE_PLUGIN_OPTION_HOOK_ENABLED - plugin opt-in (default: false)
+  CLAUDE_PLUGIN_OPTION_HOOK_ENABLED - plugin switch (unset means enabled)
   DECLAUDE_TOKEN - dk_ API key or session token (manual install / migration)
   DECLAUDE_URL   - service base URL (default: production)
 """
+
 from __future__ import annotations  # runs on end-user Pythons as old as 3.7
 
 import getpass
@@ -33,7 +34,10 @@ import urllib.error
 import urllib.request
 
 DEFAULT_URL = "https://speak-english.tenken.co"
+# One label for both modes, so the rendition is easy to spot in a busy terminal.
+LABEL = "🧼 declaude"
 MIN_CHARS = 40  # don't burn a translation on one-liners
+
 # Claude Code dispatches up to 3 chunk invocations concurrently and fires the
 # final one immediately, so the final invocation may have to wait for earlier
 # chunks that are still in flight.
@@ -41,6 +45,17 @@ CHUNK_WAIT_SECONDS = 3.0
 # Interrupted streams (Esc, crash, hook timeout) never deliver final=true, so
 # their chunk files would otherwise accumulate forever.
 STALE_AFTER_SECONDS = 3600
+# One 402 is news. The same 402 on every later reply is noise, and each one
+# costs a request in the display path. So record it and stay quiet.
+QUOTA_MARKER = "quota-exhausted"
+
+
+class QuotaExhausted(str):
+    """The account hit its monthly limit. Carries the notice to display.
+
+    Quota exhaustion is the one failure worth showing. Every reply costs a
+    translation now, so a silent stop reads as a broken plugin.
+    """
 
 
 def translate(
@@ -139,6 +154,46 @@ def _sweep_stale(buffer_dir: str) -> None:
             pass
 
 
+def _quota_held(buffer_dir: str | None) -> bool:
+    """True while a recent 402 is on record.
+
+    Check age here instead of relying on the chunk sweeper. Stop hooks never
+    collect chunks, but their quota hold still has to expire.
+    """
+    if buffer_dir is None:
+        return False
+    marker = os.path.join(buffer_dir, QUOTA_MARKER)
+    try:
+        if os.lstat(marker).st_mtime >= time.time() - STALE_AFTER_SECONDS:
+            return True
+        os.unlink(marker)
+    except OSError:
+        pass
+    return False
+
+
+def _note_quota(buffer_dir: str | None) -> bool:
+    """Claim the right to show the quota notice.
+
+    Hook processes run concurrently across Claude sessions. O_EXCL makes one
+    process the winner when several requests discover the exhausted quota at
+    the same time.
+    """
+    if buffer_dir is None:
+        return True
+    try:
+        fd = os.open(
+            os.path.join(buffer_dir, QUOTA_MARKER),
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            0o600,
+        )
+        with os.fdopen(fd, "w") as f:
+            f.write("")
+        return True
+    except OSError:
+        return False
+
+
 def _chunk_path(buffer_dir: str, key: str, index: int) -> str:
     return os.path.join(buffer_dir, f"{key}.{index}")
 
@@ -181,9 +236,23 @@ def _cleanup_chunks(buffer_dir: str, key: str, final_index: int) -> None:
             pass
 
 
+def _quota_notice(error: urllib.error.HTTPError) -> str:
+    """Build the one-line notice shown when the account hits its monthly limit."""
+    notice = "monthly translation limit reached, so this reply was not rewritten."
+    try:
+        body = json.load(error)
+    except Exception:  # noqa: BLE001 - the notice must not depend on the body
+        return notice
+    upgrade = body.get("upgrade_url") if isinstance(body, dict) else None
+    if isinstance(upgrade, str):
+        return notice + " Upgrade: " + upgrade
+    return notice
+
+
 def _plain_rendition(text: str, token: str, timeout: int) -> str | None:
     """Shared gate for both modes: skip short messages, translate, and drop
-    renditions that add nothing. Any failure degrades gracefully to None."""
+    renditions that add nothing. Any failure degrades gracefully to None, except
+    an exhausted quota, which returns a QuotaExhausted notice to display."""
     if len(text) < MIN_CHARS:
         return None
     try:
@@ -195,11 +264,7 @@ def _plain_rendition(text: str, token: str, timeout: int) -> str | None:
         )
     except urllib.error.HTTPError as e:
         if e.code == 402:
-            print(
-                "declaude: free tier exhausted — upgrade via the payment link"
-                " in the 402 response",
-                file=sys.stderr,
-            )
+            return QuotaExhausted(_quota_notice(e))
         return None  # degrade gracefully: never break the user's session
     except Exception:  # noqa: BLE001 - fail open: no failure may break the session
         return None
@@ -212,9 +277,9 @@ def handle_message_display(payload: dict, token: str) -> int:
     """Buffer chunks; on the final one, attach the plain rendition via
     displayContent. Emitting nothing leaves the original displayed (fail open).
 
-    MessageDisplay is undocumented and its payload shape may drift between
-    Claude Code versions, so anything unexpected means do nothing rather than
-    guess."""
+    Validate the documented payload because older Claude Code versions and
+    future schema changes must fail open rather than collapse messages onto a
+    shared buffer key."""
     delta = payload.get("delta")
     if delta is None:
         delta = ""
@@ -245,10 +310,17 @@ def handle_message_display(payload: dict, token: str) -> int:
         return 0
     if earlier is None:
         return 0
+    if _quota_held(buffer_dir):
+        return 0
     plain = _plain_rendition(earlier + delta, token, timeout=25)
     if plain is None:
         return 0
-    out = f"{delta}\n\n[declaude] plain English:\n\n{plain}"
+    if isinstance(plain, QuotaExhausted):
+        if not _note_quota(buffer_dir):
+            return 0
+        out = f"{delta}\n\n{LABEL} {plain}"
+    else:
+        out = f"{delta}\n\n{LABEL} plain English:\n\n{plain}"
     print(
         json.dumps(
             {
@@ -267,24 +339,43 @@ def handle_stop(payload: dict, token: str) -> int:
     if not text:
         return 0
     # Stop is not on the display path, so it can afford to ride out a cold GPU.
+    buffer_dir = _buffer_dir()
+    if _quota_held(buffer_dir):
+        return 0
     plain = _plain_rendition(text, token, timeout=120)
     if plain is None:
         return 0
-    print(
-        json.dumps({"systemMessage": f"[declaude] plain-English version:\n\n{plain}"})
-    )
+    if isinstance(plain, QuotaExhausted):
+        if not _note_quota(buffer_dir):
+            return 0
+        print(json.dumps({"systemMessage": f"{LABEL} {plain}"}))
+        return 0
+    print(json.dumps({"systemMessage": f"{LABEL} plain English:\n\n{plain}"}))
     return 0
 
 
 def main() -> int:
-    # Version 1.0 documented a manual hook registration. Marketplace updates
-    # must not activate this second, paid invocation until the user removes the
-    # old entry and explicitly opts in through /declaude:setup. Manual
-    # invocations do not carry --plugin and keep their existing behavior.
+    # The plugin rewrites replies by default, so a fresh install works at once.
+    # An explicit false turns the hook off.
+    #
+    # The manifest deliberately declares no default. An unset option therefore
+    # arrives absent and means on here. Keeping the default out of the manifest
+    # also makes the legacy guard below safe if Claude Code starts exporting
+    # declared defaults to match its documented userConfig contract.
+    #
+    # The second branch protects version 1.0 users. Their manual hook plus this
+    # one would bill every reply twice. An unset option does arrive empty, so
+    # the branch fires for them.
+    #
+    # Manual invocations do not carry --plugin and keep their existing behavior.
     plugin_invocation = "--plugin" in sys.argv[1:]
     if plugin_invocation:
-        enabled = os.environ.get("CLAUDE_PLUGIN_OPTION_HOOK_ENABLED", "").lower()
-        if enabled not in {"1", "true", "yes", "on"}:
+        enabled = (
+            os.environ.get("CLAUDE_PLUGIN_OPTION_HOOK_ENABLED", "").strip().lower()
+        )
+        if enabled in {"0", "false", "no", "off"}:
+            return 0
+        if not enabled and os.environ.get("DECLAUDE_TOKEN"):
             return 0
         token = os.environ.get("CLAUDE_PLUGIN_OPTION_API_KEY") or os.environ.get(
             "DECLAUDE_TOKEN"
