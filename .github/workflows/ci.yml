@@ -29,11 +29,16 @@ jobs:
 
   hook:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hook
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
+      - name: Lint
+        # --isolated: the hook ships no project config, so pin the rules to ruff's own.
+        run: uv run --no-project --with ruff ruff check --isolated .
       - name: Test hook client
-        working-directory: hook
         run: uv run --no-project --with pytest pytest -q .
 
   infra:

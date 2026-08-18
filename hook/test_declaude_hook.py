@@ -7,9 +7,8 @@ import stat
 import sys
 import time
 
-import pytest
-
 import declaude_hook as dh
+import pytest
 
 POSIX = hasattr(os, "getuid")
 
@@ -22,7 +21,7 @@ def buffer_home(monkeypatch, tmp_path):
 
 
 def _chunk_file(buffer_home, index, key="s1-m1"):
-    return buffer_home / "{}.{}".format(key, index)
+    return buffer_home / f"{key}.{index}"
 
 
 def _capturing_translate(seen, result="plain version"):
