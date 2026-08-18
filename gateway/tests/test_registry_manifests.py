@@ -119,12 +119,14 @@ def test_plugin_ships_the_setup_skill():
     assert (ROOT / "skills" / "setup" / "SKILL.md").is_file()
 
 
-def test_plugin_configuration_defaults_the_paid_hook_off_and_secures_the_key():
+def test_plugin_configuration_rewrites_by_default_and_demands_a_secure_key():
+    """A fresh install rewrites replies, and Claude Code refuses an empty key."""
     options = PLUGIN["userConfig"]
     assert options["hook_enabled"]["type"] == "boolean"
-    assert options["hook_enabled"]["default"] is False
+    assert options["hook_enabled"]["default"] is True
     assert options["api_key"]["type"] == "string"
     assert options["api_key"]["sensitive"] is True
+    assert options["api_key"]["required"] is True
 
 
 def test_setup_requires_opt_in_without_replacing_an_existing_key():
