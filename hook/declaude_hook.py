@@ -195,16 +195,15 @@ def _cleanup_chunks(buffer_dir: str, key: str, final_index: int) -> None:
 
 def _quota_notice(error: urllib.error.HTTPError) -> str:
     """Build the one-line notice shown when the account hits its monthly limit."""
-    upgrade = ""
+    notice = "monthly translation limit reached, so this reply was not rewritten."
     try:
         body = json.load(error)
-        if isinstance(body.get("upgrade_url"), str):
-            upgrade = " Upgrade: " + body["upgrade_url"]
     except Exception:  # noqa: BLE001 - the notice must not depend on the body
-        pass
-    return (
-        "monthly translation limit reached, so this reply was not rewritten." + upgrade
-    )
+        return notice
+    upgrade = body.get("upgrade_url") if isinstance(body, dict) else None
+    if isinstance(upgrade, str):
+        return notice + " Upgrade: " + upgrade
+    return notice
 
 
 def _plain_rendition(text: str, token: str, timeout: int) -> str | None:
