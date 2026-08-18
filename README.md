@@ -47,6 +47,19 @@ processed in memory and discarded, never written to disk, a database, or logs.
 
 ## Quick start
 
+In Claude Code, install the plugin. It brings the skill and registers the hook:
+
+```
+/plugin marketplace add tenkenco/declaude
+/plugin install declaude@tenken
+```
+
+Then run `/declaude:setup`. It safely migrates any manual hook, configures a `dk_` key, and
+opts into the plugin hook. Claude Code stores the key in secure plugin configuration. The
+registered hook stays inert until setup enables it.
+
+For the MCP server on its own, in Claude Code or any other MCP client:
+
 ```bash
 claude mcp add --transport http declaude https://speak-english.tenken.co/mcp
 ```
@@ -57,7 +70,7 @@ token. That is the whole setup.
 | Surface | Use it for | Docs |
 |---|---|---|
 | **MCP server** | Claude Code, Cursor, any MCP client. Tools: `translate`, `usage` | [skill](skills/declaude/SKILL.md) |
-| **Claude Code hook** | Rewrites replies as they render, costs zero Claude tokens | [hook/](hook/) |
+| **Claude Code hook** | Rewrites replies as they render, costs zero Claude tokens. The plugin registers it | [hook/](hook/) |
 | **Documents** | Drop a `.md`/`.txt`, get it back rewritten | [web](https://speak-english.tenken.co/documents) |
 | **REST API** | `POST /v1/translate`, `/v1/documents`, `/v1/usage` | [skill](skills/declaude/SKILL.md#rest-api) |
 | **OpenAI-compatible** | `POST /v1/chat/completions` — point any OpenAI client at `/v1` | [skill](skills/declaude/SKILL.md#rest-api) |
@@ -80,6 +93,7 @@ client ── API key / OAuth / Clerk JWT ──> Cloud Run gateway ── VPC �
 - **infra/** — Terraform, state in GCS, plan converges to zero diff. The GPU tier is
   private-IP spot instances behind an internal L7 load balancer.
 - **hook/** — Claude Code hook client. Fails open; never blocks a session.
+- **hooks/** — `hooks.json`, the plugin registration Claude Code reads on install.
 - **CI** — lint, tests and coverage on every PR; security scans and a production smoke test
   daily.
 

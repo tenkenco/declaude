@@ -15,6 +15,8 @@ ROOT = Path(__file__).resolve().parents[2]
 SERVER = json.loads((ROOT / "server.json").read_text())
 PLUGIN = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text())
 MARKET = json.loads((ROOT / ".claude-plugin" / "marketplace.json").read_text())
+HOOKS = json.loads((ROOT / "hooks" / "hooks.json").read_text())["hooks"]
+SETUP_SKILL = (ROOT / "skills" / "setup" / "SKILL.md").read_text()
 
 
 def test_server_json_advertises_the_real_mcp_endpoint():
@@ -75,3 +77,56 @@ def test_server_json_matches_what_is_actually_published():
     assert SERVER["$schema"].endswith("/2025-12-11/server.schema.json"), (
         "published under the 2025-12-11 schema; bumping this file without republishing splits them"
     )
+
+
+def test_plugin_registers_the_hook_on_install():
+    """The hook is the reason most people install this. Registering it here is what turns a
+    manual settings.json edit into one `/plugin install`."""
+    assert "MessageDisplay" in HOOKS
+    entries = HOOKS["MessageDisplay"][0]["hooks"]
+    assert [e["type"] for e in entries] == ["command"]
+
+
+def test_plugin_registers_exactly_one_hook_event():
+    """Two events means every reply is translated twice and billed twice."""
+    assert set(HOOKS) == {"MessageDisplay"}, "Stop and MessageDisplay together double the bill"
+    assert len(HOOKS["MessageDisplay"]) == 1
+
+
+def test_hook_command_runs_the_script_that_ships_with_the_plugin():
+    handler = HOOKS["MessageDisplay"][0]["hooks"][0]
+    assert handler["command"] == "python3"
+    assert handler["args"] == [
+        "${CLAUDE_PLUGIN_ROOT}/hook/declaude_hook.py",
+        "--plugin",
+    ], "exec form passes plugin paths safely without shell quoting"
+    assert (ROOT / "hook" / "declaude_hook.py").is_file()
+
+
+def test_hook_timeout_survives_a_cold_gpu():
+    """MessageDisplay defaults to a 10 second timeout. A spot reclaim wakes the GPU slower."""
+    assert HOOKS["MessageDisplay"][0]["hooks"][0]["timeout"] >= 30
+
+
+def test_hooks_are_declared_in_one_place_only():
+    """hooks/hooks.json is loaded by its location. Naming it in plugin.json as well risks
+    registering the same hook twice, which bills every reply twice."""
+    assert "hooks" not in PLUGIN
+
+
+def test_plugin_ships_the_setup_skill():
+    """Registration is half the job; setup safely opts into the paid hook."""
+    assert (ROOT / "skills" / "setup" / "SKILL.md").is_file()
+
+
+def test_plugin_configuration_defaults_the_paid_hook_off_and_secures_the_key():
+    options = PLUGIN["userConfig"]
+    assert options["hook_enabled"]["type"] == "boolean"
+    assert options["hook_enabled"]["default"] is False
+    assert options["api_key"]["type"] == "string"
+    assert options["api_key"]["sensitive"] is True
+
+
+def test_setup_requires_opt_in_without_replacing_an_existing_key():
+    assert "/plugin configure declaude@tenken" in SETUP_SKILL
+    assert "do not edit or replace it" in SETUP_SKILL.lower()

@@ -14,8 +14,10 @@ Install instructions live in hook/README.md (the single source; register only
 ONE of the two events).
 
 Env:
-  DECLAUDE_TOKEN  - dk_ API key or session token (required)
-  DECLAUDE_URL    - service base URL (default: production)
+  CLAUDE_PLUGIN_OPTION_API_KEY - secure plugin-config key (plugin install)
+  CLAUDE_PLUGIN_OPTION_HOOK_ENABLED - plugin opt-in (default: false)
+  DECLAUDE_TOKEN - dk_ API key or session token (manual install / migration)
+  DECLAUDE_URL   - service base URL (default: production)
 """
 from __future__ import annotations  # runs on end-user Pythons as old as 3.7
 
@@ -138,7 +140,7 @@ def _sweep_stale(buffer_dir: str) -> None:
 
 
 def _chunk_path(buffer_dir: str, key: str, index: int) -> str:
-    return os.path.join(buffer_dir, "{}.{}".format(key, index))
+    return os.path.join(buffer_dir, f"{key}.{index}")
 
 
 def _write_chunk(buffer_dir: str, key: str, index: int, delta: str) -> None:
@@ -148,7 +150,7 @@ def _write_chunk(buffer_dir: str, key: str, index: int, delta: str) -> None:
     final invocation can treat existence as done. O_EXCL on the scratch file
     refuses to follow a planted symlink; 0600 keeps the text private.
     """
-    scratch = os.path.join(buffer_dir, "{}.{}.part{}".format(key, index, os.getpid()))
+    scratch = os.path.join(buffer_dir, f"{key}.{index}.part{os.getpid()}")
     fd = os.open(scratch, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(delta)
@@ -199,7 +201,7 @@ def _plain_rendition(text: str, token: str, timeout: int) -> str | None:
                 file=sys.stderr,
             )
         return None  # degrade gracefully: never break the user's session
-    except Exception:
+    except Exception:  # noqa: BLE001 - fail open: no failure may break the session
         return None
     if not plain.strip() or plain.strip() == text.strip():
         return None
@@ -228,7 +230,7 @@ def handle_message_display(payload: dict, token: str) -> int:
         or index < 0
     ):
         return 0
-    key = re.sub(r"[^A-Za-z0-9-]", "_", "{}-{}".format(session_id, message_id))
+    key = re.sub(r"[^A-Za-z0-9-]", "_", f"{session_id}-{message_id}")
     buffer_dir = _buffer_dir()
     if buffer_dir is None:
         return 0
@@ -275,7 +277,20 @@ def handle_stop(payload: dict, token: str) -> int:
 
 
 def main() -> int:
-    token = os.environ.get("DECLAUDE_TOKEN")
+    # Version 1.0 documented a manual hook registration. Marketplace updates
+    # must not activate this second, paid invocation until the user removes the
+    # old entry and explicitly opts in through /declaude:setup. Manual
+    # invocations do not carry --plugin and keep their existing behavior.
+    plugin_invocation = "--plugin" in sys.argv[1:]
+    if plugin_invocation:
+        enabled = os.environ.get("CLAUDE_PLUGIN_OPTION_HOOK_ENABLED", "").lower()
+        if enabled not in {"1", "true", "yes", "on"}:
+            return 0
+        token = os.environ.get("CLAUDE_PLUGIN_OPTION_API_KEY") or os.environ.get(
+            "DECLAUDE_TOKEN"
+        )
+    else:
+        token = os.environ.get("DECLAUDE_TOKEN")
     if not token:
         return 0  # not configured: never block the session
     try:

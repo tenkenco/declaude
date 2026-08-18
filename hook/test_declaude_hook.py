@@ -1,5 +1,6 @@
 """Tests for the client hook (run: python3 -m pytest hook/ or uv run --with pytest pytest)."""
 
+import io
 import json
 import os
 import stat
@@ -21,7 +22,7 @@ def buffer_home(monkeypatch, tmp_path):
 
 
 def _chunk_file(buffer_home, index, key="s1-m1"):
-    return buffer_home / "{}.{}".format(key, index)
+    return buffer_home / f"{key}.{index}"
 
 
 def _capturing_translate(seen, result="plain version"):
@@ -71,11 +72,77 @@ def test_main_without_token_is_noop(monkeypatch, capsys):
 
 
 def test_main_never_raises_on_bad_stdin(monkeypatch):
-    import io
-
     monkeypatch.setenv("DECLAUDE_TOKEN", "x")
     monkeypatch.setattr(sys, "stdin", io.StringIO("><"))
     assert dh.main() == 0
+
+
+def test_plugin_invocation_is_inert_until_explicitly_enabled(monkeypatch, capsys):
+    """An automatic plugin update must not activate a second paid hook for users
+    who still have the old manual registration."""
+    monkeypatch.setenv("DECLAUDE_TOKEN", "x")
+    monkeypatch.delenv("CLAUDE_PLUGIN_OPTION_HOOK_ENABLED", raising=False)
+    monkeypatch.setattr(sys, "argv", ["declaude_hook.py", "--plugin"])
+    monkeypatch.setattr(
+        sys,
+        "stdin",
+        io.StringIO(json.dumps(_md_payload("x" * 80, index=0, final=True))),
+    )
+    monkeypatch.setattr(
+        dh,
+        "handle_message_display",
+        lambda *args: pytest.fail("plugin hook must stay inert before opt-in"),
+    )
+
+    assert dh.main() == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_plugin_invocation_runs_after_explicit_opt_in(monkeypatch):
+    monkeypatch.delenv("DECLAUDE_TOKEN", raising=False)
+    monkeypatch.setenv("CLAUDE_PLUGIN_OPTION_HOOK_ENABLED", "true")
+    monkeypatch.setenv("CLAUDE_PLUGIN_OPTION_API_KEY", "x")
+    monkeypatch.setattr(sys, "argv", ["declaude_hook.py", "--plugin"])
+    monkeypatch.setattr(
+        sys,
+        "stdin",
+        io.StringIO(json.dumps(_md_payload("x" * 80, index=0, final=True))),
+    )
+    seen = {}
+
+    def handle(payload, token):
+        seen["payload"] = payload
+        seen["token"] = token
+        return 0
+
+    monkeypatch.setattr(dh, "handle_message_display", handle)
+
+    assert dh.main() == 0
+    assert seen["token"] == "x"
+    assert seen["payload"]["hook_event_name"] == "MessageDisplay"
+
+
+def test_manual_invocation_keeps_working_without_plugin_opt_in(monkeypatch):
+    monkeypatch.setenv("DECLAUDE_TOKEN", "x")
+    monkeypatch.delenv("CLAUDE_PLUGIN_OPTION_HOOK_ENABLED", raising=False)
+    monkeypatch.setattr(sys, "argv", ["declaude_hook.py"])
+    monkeypatch.setattr(
+        sys,
+        "stdin",
+        io.StringIO(json.dumps(_md_payload("x" * 80, index=0, final=True))),
+    )
+    seen = {}
+
+    def handle(payload, token):
+        seen["payload"] = payload
+        seen["token"] = token
+        return 0
+
+    monkeypatch.setattr(dh, "handle_message_display", handle)
+
+    assert dh.main() == 0
+    assert seen["token"] == "x"
+    assert seen["payload"]["hook_event_name"] == "MessageDisplay"
 
 
 def _md_payload(delta, *, index, final, message_id="m1", session_id="s1"):

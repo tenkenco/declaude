@@ -1,7 +1,7 @@
 {
   "name": "declaude",
   "description": "Rewrites Claude-English into plain English: sycophantic openers, hedging filler and padded phrasing out, facts, code blocks, names and numbers untouched. Runs an open-weights model on dedicated GPUs, so text never reaches a commercial AI provider.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": {
     "name": "Tenken",
     "url": "https://www.tenken.co"
@@ -9,6 +9,20 @@
   "homepage": "https://speak-english.tenken.co",
   "repository": "https://github.com/tenkenco/declaude",
   "license": "MIT",
+  "userConfig": {
+    "api_key": {
+      "type": "string",
+      "title": "API key",
+      "description": "A dk_ key from speak-english.tenken.co/signin.",
+      "sensitive": true
+    },
+    "hook_enabled": {
+      "type": "boolean",
+      "title": "Enable automatic rewrites",
+      "description": "Enable only after removing any manual declaude hook. Successful rewrites count against your quota.",
+      "default": false
+    }
+  },
   "keywords": [
     "writing",
     "plain-language",
