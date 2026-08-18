@@ -1,6 +1,5 @@
 """Tests for the client hook (run: python3 -m pytest hook/ or uv run --with pytest pytest)."""
 
-from concurrent.futures import ThreadPoolExecutor
 import io
 import json
 import os
@@ -8,6 +7,7 @@ import stat
 import sys
 import time
 import urllib.error
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
