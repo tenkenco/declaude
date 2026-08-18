@@ -15,9 +15,13 @@ import declaude_hook as dh
 POSIX = hasattr(os, "getuid")
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def buffer_home(monkeypatch, tmp_path):
-    """Point the hook's buffer directory under tmp_path and return it."""
+    """Point the hook's buffer directory under tmp_path and return it.
+
+    Autouse: handle_stop touches the buffer directory too, so a test without
+    this fixture would write a real marker into the developer's temp directory
+    and poison every later run."""
     monkeypatch.setattr(dh.tempfile, "gettempdir", lambda: str(tmp_path))
     return tmp_path / ("declaude-" + dh._user_key())
 
@@ -511,3 +515,73 @@ def test_other_http_errors_stay_silent(buffer_home, capsys, monkeypatch):
         == 0
     )
     assert capsys.readouterr().out == ""
+
+
+def test_quota_notice_shows_once_and_stops_calling(buffer_home, capsys, monkeypatch):
+    """The same 402 on every reply is noise, and each one costs a request."""
+    calls = []
+
+    def refuse(text, **kwargs):
+        calls.append(text)
+        raise _http_402()
+
+    monkeypatch.setattr(dh, "translate", refuse)
+
+    first = _md_payload("x" * 80, index=0, final=True, message_id="m-a")
+    assert dh.handle_message_display(first, "tok") == 0
+    assert "monthly translation limit reached" in capsys.readouterr().out
+    assert len(calls) == 1
+
+    second = _md_payload("y" * 80, index=0, final=True, message_id="m-b")
+    assert dh.handle_message_display(second, "tok") == 0
+    assert capsys.readouterr().out == "", "the notice must not repeat"
+    assert len(calls) == 1, "a held quota must not cost another request"
+    assert (buffer_home / dh.QUOTA_MARKER).exists()
+
+
+def test_quota_hold_expires_so_an_upgrade_takes_effect(
+    buffer_home, capsys, monkeypatch
+):
+    """_sweep_stale expires the marker, so a paid upgrade needs no restart."""
+
+    def refuse(text, **kwargs):
+        raise _http_402()
+
+    monkeypatch.setattr(dh, "translate", refuse)
+    assert (
+        dh.handle_message_display(_md_payload("x" * 80, index=0, final=True), "tok")
+        == 0
+    )
+    capsys.readouterr()
+    marker = buffer_home / dh.QUOTA_MARKER
+    assert marker.exists()
+
+    stale = time.time() - dh.STALE_AFTER_SECONDS - 60
+    os.utime(marker, (stale, stale))
+
+    monkeypatch.setattr(dh, "translate", lambda text, **k: "plain version")
+    assert (
+        dh.handle_message_display(
+            _md_payload("z" * 80, index=0, final=True, message_id="m-c"), "tok"
+        )
+        == 0
+    )
+    dc = json.loads(capsys.readouterr().out)["hookSpecificOutput"]["displayContent"]
+    assert "plain version" in dc
+    assert not marker.exists(), "the stale marker must be swept"
+
+
+def test_stop_quota_notice_shows_once(tmp_path, buffer_home, capsys, monkeypatch):
+    calls = []
+
+    def refuse(text, **kwargs):
+        calls.append(text)
+        raise _http_402()
+
+    monkeypatch.setattr(dh, "translate", refuse)
+    assert dh.handle_stop(_stop_payload(tmp_path, "x" * 80), "tok") == 0
+    assert "monthly translation limit reached" in capsys.readouterr().out
+
+    assert dh.handle_stop(_stop_payload(tmp_path, "y" * 80), "tok") == 0
+    assert capsys.readouterr().out == ""
+    assert len(calls) == 1

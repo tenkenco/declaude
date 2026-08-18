@@ -45,6 +45,9 @@ CHUNK_WAIT_SECONDS = 3.0
 # Interrupted streams (Esc, crash, hook timeout) never deliver final=true, so
 # their chunk files would otherwise accumulate forever.
 STALE_AFTER_SECONDS = 3600
+# One 402 is news. The same 402 on every later reply is noise, and each one
+# costs a request in the display path. So record it and stay quiet.
+QUOTA_MARKER = "quota-exhausted"
 
 
 class QuotaExhausted(str):
@@ -149,6 +152,25 @@ def _sweep_stale(buffer_dir: str) -> None:
                 os.unlink(path)
         except OSError:
             pass
+
+
+def _quota_held(buffer_dir: str | None) -> bool:
+    """True while a recent 402 is on record. _sweep_stale expires the marker, so
+    an upgrade takes effect within the hour without restarting the session."""
+    if buffer_dir is None:
+        return False
+    return os.path.exists(os.path.join(buffer_dir, QUOTA_MARKER))
+
+
+def _note_quota(buffer_dir: str | None) -> None:
+    """Record the 402 so the notice shows once, not on every reply after it."""
+    if buffer_dir is None:
+        return
+    try:
+        with open(os.path.join(buffer_dir, QUOTA_MARKER), "w") as f:
+            f.write("")
+    except OSError:
+        return
 
 
 def _chunk_path(buffer_dir: str, key: str, index: int) -> str:
@@ -267,10 +289,13 @@ def handle_message_display(payload: dict, token: str) -> int:
         return 0
     if earlier is None:
         return 0
+    if _quota_held(buffer_dir):
+        return 0
     plain = _plain_rendition(earlier + delta, token, timeout=25)
     if plain is None:
         return 0
     if isinstance(plain, QuotaExhausted):
+        _note_quota(buffer_dir)
         out = f"{delta}\n\n{LABEL} {plain}"
     else:
         out = f"{delta}\n\n{LABEL} plain English:\n\n{plain}"
@@ -292,10 +317,14 @@ def handle_stop(payload: dict, token: str) -> int:
     if not text:
         return 0
     # Stop is not on the display path, so it can afford to ride out a cold GPU.
+    buffer_dir = _buffer_dir()
+    if _quota_held(buffer_dir):
+        return 0
     plain = _plain_rendition(text, token, timeout=120)
     if plain is None:
         return 0
     if isinstance(plain, QuotaExhausted):
+        _note_quota(buffer_dir)
         print(json.dumps({"systemMessage": f"{LABEL} {plain}"}))
         return 0
     print(json.dumps({"systemMessage": f"{LABEL} plain English:\n\n{plain}"}))

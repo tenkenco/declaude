@@ -47,6 +47,12 @@ no stored value, the variable arrived absent. So the guard fires, and the
 declared default alone can never turn the hook on. The hook treats an empty
 value as on for that reason.
 
+The hook stays quiet about most failures, so a bad network never breaks a
+session. It speaks up for one case. An exhausted monthly quota shows a notice
+with the upgrade link. It shows that notice once, then records the answer and
+skips both the notice and the request. The record expires after an hour, so a
+paid upgrade takes effect without a restart.
+
 Claude Code stores `api_key` in secure storage rather than `settings.json`. The
 plugin hook exits silently while disabled or while neither the secure key nor
 `DECLAUDE_TOKEN` exists. So a missing key produces no error and no rewrite. A
