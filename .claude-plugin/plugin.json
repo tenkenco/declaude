@@ -9,6 +9,20 @@
   "homepage": "https://speak-english.tenken.co",
   "repository": "https://github.com/tenkenco/declaude",
   "license": "MIT",
+  "userConfig": {
+    "api_key": {
+      "type": "string",
+      "title": "API key",
+      "description": "A dk_ key from speak-english.tenken.co/signin.",
+      "sensitive": true
+    },
+    "hook_enabled": {
+      "type": "boolean",
+      "title": "Enable automatic rewrites",
+      "description": "Enable only after removing any manual declaude hook. Successful rewrites count against your quota.",
+      "default": false
+    }
+  },
   "keywords": [
     "writing",
     "plain-language",

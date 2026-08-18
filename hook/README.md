@@ -15,16 +15,20 @@ want the plugin.
 
 The plugin ships `hooks/hooks.json` at its root, and Claude Code loads that file
 on install. It registers the `MessageDisplay` event and points at
-`hook/declaude_hook.py` inside the plugin, with a 30 second timeout.
+`hook/declaude_hook.py` inside the plugin, with a 30 second timeout. The plugin
+invocation stays inert until its `hook_enabled` configuration option is true.
 
-Two steps remain:
+Run `/declaude:setup`. It performs the migration in a safe order:
 
 1. Get a `dk_` key at [/signin](https://speak-english.tenken.co/signin).
-2. `export DECLAUDE_TOKEN=<key>` in your shell profile, then start Claude Code
-   from a new terminal.
+2. Remove any old manual hook entry.
+3. Run `/plugin configure declaude@tenken`, enter the key in the masked
+   `api_key` field, and set `hook_enabled` to true.
 
-The hook exits silently while `DECLAUDE_TOKEN` is unset, so the plugin is inert
-until you finish those steps. Run `/declaude:setup` to walk through them.
+Claude Code stores `api_key` in secure storage rather than `settings.json`. The
+plugin hook exits silently while disabled or while neither the secure key nor
+`DECLAUDE_TOKEN` exists. A manual hook still uses `DECLAUDE_TOKEN`, so existing
+version 1.0 setups keep working until the user deliberately migrates them.
 
 If you already registered this hook by hand, remove that entry now. A manual
 entry plus the plugin translates every reply twice and bills you twice. Claude
@@ -75,6 +79,8 @@ versions the original text displays unchanged.
 
 Set `timeout: 30` explicitly. The event's default timeout is 10 seconds, which
 a cold GPU (spot reclaim) can miss.
+
+Manual installs use `DECLAUDE_TOKEN` and do not read plugin configuration.
 
 Messages under 40 characters are skipped before the service is called, so they
 cost no quota. A rendition that comes back empty or identical to the original

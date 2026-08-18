@@ -24,7 +24,8 @@ in one step:
 /plugin install declaude@tenken
 ```
 
-Then run `/declaude:setup` to add the key the hook needs.
+Then run `/declaude:setup`. It removes any old manual hook, stores the key in
+Claude Code's secure plugin configuration, and explicitly enables the plugin hook.
 
 For the MCP server on its own:
 
@@ -82,7 +83,9 @@ into the model's context. The hook fails open, so any error leaves the original 
 screen. Older Claude Code versions lack the event and display the original text too.
 
 The plugin registers this hook on install, through `hooks/hooks.json` at the plugin root.
-Only `DECLAUDE_TOKEN` remains, and `/declaude:setup` walks the user through it.
+Its `hook_enabled` user-config option defaults to false. This prevents an automatic update
+from running alongside a version 1.0 manual hook. `/declaude:setup` removes the manual entry
+before storing the key securely and enabling the plugin hook.
 
 Manual install steps, the settings.json snippets for both the `MessageDisplay` and fallback
 `Stop` registrations, and the timeout guidance live in

@@ -54,8 +54,9 @@ In Claude Code, install the plugin. It brings the skill and registers the hook:
 /plugin install declaude@tenken
 ```
 
-Then run `/declaude:setup`. It walks you through the one remaining step: a `dk_` key in
-`DECLAUDE_TOKEN`, which the hook reads.
+Then run `/declaude:setup`. It safely migrates any manual hook, configures a `dk_` key, and
+opts into the plugin hook. Claude Code stores the key in secure plugin configuration. The
+registered hook stays inert until setup enables it.
 
 For the MCP server on its own, in Claude Code or any other MCP client:
 

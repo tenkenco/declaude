@@ -1,49 +1,18 @@
 ---
 name: setup
-description: Finish declaude setup after installing the plugin. Use when the plain-English renditions do not appear, when DECLAUDE_TOKEN is unset, or when the user asks to set up, configure or verify declaude.
+description: Finish declaude setup after installing the plugin. Use when the plain-English renditions do not appear, when the plugin key or opt-in is unset, or when the user asks to set up, configure or verify declaude.
 ---
 
 # declaude setup
 
 The plugin already registers the Claude Code hook. It ships `hooks/hooks.json`, which
-Claude Code loads on install. The hook stays silent until the user supplies a key, so one
-step remains: set `DECLAUDE_TOKEN`.
+Claude Code loads on install. Its `hook_enabled` option defaults to false. This protects
+users upgrading from version 1.0, whose manual hook may still be registered, from
+translating and billing every reply twice.
 
 Work through the steps below in order. Report the result of each one.
 
-## 1. Check for an existing key
-
-```bash
-echo "${DECLAUDE_TOKEN:+set}"
-```
-
-Treat this answer as a hint, not proof. Your shell reads the user's profile. The hook does
-not. It inherits the environment of the process that started Claude Code. So a `set` answer
-here still fails at display time when the user added the key after that process started.
-
-An empty answer means the key is missing. Run every step below. A `set` answer means the key
-exists, so skip step 2, but still run steps 3 to 5.
-
-## 2. Get a key
-
-Send the user to [/signin](https://speak-english.tenken.co/signin). They sign in and mint a
-`dk_` key. Keys never expire. One key works for the hook, the MCP server and the REST API.
-
-Do not ask the user to paste the key into the chat. Ask them to add it in step 3 themselves.
-
-## 3. Store the key and restart
-
-Tell the user to add this line to their shell profile, such as `~/.zshrc`:
-
-```bash
-export DECLAUDE_TOKEN=dk_your_key_here
-```
-
-Then the user must open a new terminal and start Claude Code again. This step is never
-optional. The hook reads the environment of the process that started Claude Code, and a
-`/reload-plugins` call does not pick up a new environment variable.
-
-## 4. Remove any manual hook entry
+## 1. Remove any manual hook entry
 
 Claude Code merges hooks from several settings files. Search all of them:
 
@@ -59,9 +28,43 @@ Open each file the search names. Look for a `MessageDisplay` or `Stop` entry tha
 `declaude_hook.py`. Remove that entry.
 
 The plugin now registers the hook. A manual entry on top of it translates every reply
-twice and bills the user twice.
+twice and bills the user twice. Do not enable the plugin hook until every manual entry is
+removed.
 
-## 5. Verify
+## 2. Check for a legacy key
+
+```bash
+echo "${DECLAUDE_TOKEN:+set}"
+```
+
+If the answer is `set`, do not edit or replace it. The plugin can keep using
+`DECLAUDE_TOKEN` during migration. If the answer is empty, the user may still have a key in
+secure plugin storage; check that in step 3.
+
+## 3. Configure and enable the plugin hook
+
+Only after every manual entry is removed, run:
+
+```
+/plugin configure declaude@tenken
+```
+
+Set the options in the configuration dialog:
+
+- `api_key`: if a key is already stored, do not edit or replace it. Existing
+  `DECLAUDE_TOKEN` users may leave this empty because the plugin falls back to that
+  environment variable. If both locations are empty, cancel the dialog, get a `dk_` key at
+  [/signin](https://speak-english.tenken.co/signin), reopen the dialog, and enter the key in
+  this masked field. Do not paste it into the chat.
+- `hook_enabled`: set to true only after a key is available.
+
+Claude Code stores `api_key` in secure storage and exports it only to the plugin process as
+`CLAUDE_PLUGIN_OPTION_API_KEY`. It stores the Boolean opt-in in user settings. Project files
+cannot supply either value.
+
+## 4. Verify
+
+If the plugin is using legacy `DECLAUDE_TOKEN`, verify that key:
 
 ```bash
 curl -s -w '\nHTTP %{http_code}\n' https://speak-english.tenken.co/v1/usage \
@@ -71,8 +74,8 @@ curl -s -w '\nHTTP %{http_code}\n' https://speak-english.tenken.co/v1/usage \
 `HTTP 200` with plan and usage counts means the key works. `HTTP 401` means the key is
 wrong. `HTTP 503` means the GPU is warming up, so retry shortly.
 
-This call proves the key, not the hook. It runs in your shell, which reads the user's
-profile. So it can pass while the hook still has no key.
+This proves the key, not the hook. Skip the command when the key is in plugin configuration;
+secure plugin values are deliberately unavailable to the shell.
 
 The hook itself is proven only in a session. Ask the user to start a new Claude Code
 session and send any prompt. A reply longer than 40 characters shows a
@@ -80,10 +83,9 @@ session and send any prompt. A reply longer than 40 characters shows a
 
 ## If nothing appears
 
-- The running Claude Code process may lack the key. This is the most common cause. The user
-  set the key after starting Claude Code, or started it from a desktop icon that never read
-  the shell profile. Ask them to start Claude Code from a terminal that prints the key with
-  `echo "${DECLAUDE_TOKEN:+set}"`.
+- Open `/plugin configure declaude@tenken` and confirm `hook_enabled` is true and `api_key`
+  is set. If the plugin relies on legacy `DECLAUDE_TOKEN`, start Claude Code from a terminal
+  that prints `set` for `echo "${DECLAUDE_TOKEN:+set}"`.
 - Replies under 40 characters are skipped on purpose.
 - A rendition identical to the original is dropped rather than shown.
 - The hook fails open. Any error leaves the original reply on screen.

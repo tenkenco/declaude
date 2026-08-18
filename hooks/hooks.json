@@ -5,7 +5,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hook/declaude_hook.py\"",
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hook/declaude_hook.py",
+              "--plugin"
+            ],
             "timeout": 30
           }
         ]

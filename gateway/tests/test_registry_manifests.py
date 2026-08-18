@@ -16,6 +16,7 @@ SERVER = json.loads((ROOT / "server.json").read_text())
 PLUGIN = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text())
 MARKET = json.loads((ROOT / ".claude-plugin" / "marketplace.json").read_text())
 HOOKS = json.loads((ROOT / "hooks" / "hooks.json").read_text())["hooks"]
+SETUP_SKILL = (ROOT / "skills" / "setup" / "SKILL.md").read_text()
 
 
 def test_server_json_advertises_the_real_mcp_endpoint():
@@ -93,9 +94,12 @@ def test_plugin_registers_exactly_one_hook_event():
 
 
 def test_hook_command_runs_the_script_that_ships_with_the_plugin():
-    command = HOOKS["MessageDisplay"][0]["hooks"][0]["command"]
-    assert "${CLAUDE_PLUGIN_ROOT}" in command, "an absolute path breaks on every other machine"
-    assert '"${CLAUDE_PLUGIN_ROOT}/hook/declaude_hook.py"' in command, "quote it: paths hold spaces"
+    handler = HOOKS["MessageDisplay"][0]["hooks"][0]
+    assert handler["command"] == "python3"
+    assert handler["args"] == [
+        "${CLAUDE_PLUGIN_ROOT}/hook/declaude_hook.py",
+        "--plugin",
+    ], "exec form passes plugin paths safely without shell quoting"
     assert (ROOT / "hook" / "declaude_hook.py").is_file()
 
 
@@ -111,5 +115,18 @@ def test_hooks_are_declared_in_one_place_only():
 
 
 def test_plugin_ships_the_setup_skill():
-    """Installing the hook is half the job; the user still needs a key."""
+    """Registration is half the job; setup safely opts into the paid hook."""
     assert (ROOT / "skills" / "setup" / "SKILL.md").is_file()
+
+
+def test_plugin_configuration_defaults_the_paid_hook_off_and_secures_the_key():
+    options = PLUGIN["userConfig"]
+    assert options["hook_enabled"]["type"] == "boolean"
+    assert options["hook_enabled"]["default"] is False
+    assert options["api_key"]["type"] == "string"
+    assert options["api_key"]["sensitive"] is True
+
+
+def test_setup_requires_opt_in_without_replacing_an_existing_key():
+    assert "/plugin configure declaude@tenken" in SETUP_SKILL
+    assert "do not edit or replace it" in SETUP_SKILL.lower()
