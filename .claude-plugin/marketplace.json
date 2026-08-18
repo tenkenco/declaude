@@ -9,7 +9,7 @@
     {
       "name": "declaude",
       "source": "./",
-      "description": "Rewrites Claude-English into plain English. Registers an opt-in Claude Code hook for inline plain renditions.",
+      "description": "Rewrites Claude-English into plain English. Registers a Claude Code hook that adds an inline plain rendition under each reply.",
       "category": "productivity"
     }
   ]
