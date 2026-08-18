@@ -306,12 +306,16 @@ def main() -> int:
     # The plugin rewrites replies by default, so a fresh install works at once.
     # An explicit false turns the hook off.
     #
-    # The second branch is a best-effort guard for version 1.0 users, whose
-    # manual hook would bill every reply twice. It fires only when Claude Code
-    # leaves CLAUDE_PLUGIN_OPTION_HOOK_ENABLED empty for an unset option. If
-    # Claude Code instead exports the declared default, this branch never runs,
-    # and /declaude:setup remains the only migration guard. Confirm which
-    # behavior Claude Code has before you rely on this branch.
+    # Claude Code omits an unset option from the hook environment. It does not
+    # export the declared default. Measured on 2026-08-18: with the default
+    # declared true and no stored value, the variable arrived absent. So the
+    # declared default alone can never turn this hook on, and the empty case
+    # has to mean on. Do not restore the old "explicit true only" gate, because
+    # that combination ships the feature dead.
+    #
+    # The second branch protects version 1.0 users. Their manual hook plus this
+    # one would bill every reply twice. An unset option does arrive empty, so
+    # the branch fires for them.
     #
     # Manual invocations do not carry --plugin and keep their existing behavior.
     plugin_invocation = "--plugin" in sys.argv[1:]

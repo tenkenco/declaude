@@ -38,10 +38,14 @@ The `hook_enabled` field takes `true` or `false`. Type `false` to stop automatic
 rewrites.
 
 The hook carries one more guard for version 1.0 users. It stays inert when you
-export `DECLAUDE_TOKEN` and Claude Code passes no value for `hook_enabled`. That
-guard depends on Claude Code leaving an unset option empty in the environment.
-Claude Code may instead export the declared default, which disables the guard.
-So run `/declaude:setup` when you upgrade, and remove the manual hook yourself.
+export `DECLAUDE_TOKEN` and Claude Code passes no value for `hook_enabled`. So
+run `/declaude:setup` when you upgrade, and remove the manual hook yourself.
+
+Claude Code omits an unset option from the hook environment. It does not export
+the declared default. Measured on 2026-08-18: with the default declared true and
+no stored value, the variable arrived absent. So the guard fires, and the
+declared default alone can never turn the hook on. The hook treats an empty
+value as on for that reason.
 
 Claude Code stores `api_key` in secure storage rather than `settings.json`. The
 plugin hook exits silently while disabled or while neither the secure key nor
