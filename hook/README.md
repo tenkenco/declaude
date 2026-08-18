@@ -15,20 +15,35 @@ want the plugin.
 
 The plugin ships `hooks/hooks.json` at its root, and Claude Code loads that file
 on install. It registers the `MessageDisplay` event and points at
-`hook/declaude_hook.py` inside the plugin, with a 30 second timeout. The plugin
-invocation stays inert until its `hook_enabled` configuration option is true.
+`hook/declaude_hook.py` inside the plugin, with a 30 second timeout.
 
-Run `/declaude:setup`. It performs the migration in a safe order:
+The `api_key` option is required, so Claude Code asks for a key when you enable
+the plugin. The `hook_enabled` option defaults to true. So a fresh install
+rewrites replies as soon as you paste a key.
+
+New install:
 
 1. Get a `dk_` key at [/signin](https://speak-english.tenken.co/signin).
-2. Remove any old manual hook entry.
-3. Run `/plugin configure declaude@tenken`, enter the key in the masked
-   `api_key` field, and set `hook_enabled` to true.
+2. Enable the plugin and paste the key in the masked `api_key` field.
+3. Run `/reload-plugins`, as the configuration dialog instructs.
+
+Upgrade from version 1.0: run `/declaude:setup` instead. It removes any manual
+hook entry first, because a manual entry plus the plugin bills you twice.
+
+The `hook_enabled` field takes `true` or `false`. Type `false` to stop automatic
+rewrites.
+
+The hook carries one more guard for version 1.0 users. It stays inert when you
+export `DECLAUDE_TOKEN` and Claude Code passes no value for `hook_enabled`. That
+guard depends on Claude Code leaving an unset option empty in the environment.
+Claude Code may instead export the declared default, which disables the guard.
+So run `/declaude:setup` when you upgrade, and remove the manual hook yourself.
 
 Claude Code stores `api_key` in secure storage rather than `settings.json`. The
 plugin hook exits silently while disabled or while neither the secure key nor
-`DECLAUDE_TOKEN` exists. A manual hook still uses `DECLAUDE_TOKEN`, so existing
-version 1.0 setups keep working until the user deliberately migrates them.
+`DECLAUDE_TOKEN` exists. So a missing key produces no error and no rewrite. A
+manual hook still uses `DECLAUDE_TOKEN`, so existing version 1.0 setups keep
+working until the user deliberately migrates them.
 
 If you already registered this hook by hand, remove that entry now. A manual
 entry plus the plugin translates every reply twice and bills you twice. Claude

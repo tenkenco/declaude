@@ -19,6 +19,7 @@ Env:
   DECLAUDE_TOKEN - dk_ API key or session token (manual install / migration)
   DECLAUDE_URL   - service base URL (default: production)
 """
+
 from __future__ import annotations  # runs on end-user Pythons as old as 3.7
 
 import getpass
@@ -33,6 +34,8 @@ import urllib.error
 import urllib.request
 
 DEFAULT_URL = "https://speak-english.tenken.co"
+# One label for both modes, so the rendition is easy to spot in a busy terminal.
+LABEL = "🧼 declaude"
 MIN_CHARS = 40  # don't burn a translation on one-liners
 # Claude Code dispatches up to 3 chunk invocations concurrently and fires the
 # final one immediately, so the final invocation may have to wait for earlier
@@ -248,7 +251,7 @@ def handle_message_display(payload: dict, token: str) -> int:
     plain = _plain_rendition(earlier + delta, token, timeout=25)
     if plain is None:
         return 0
-    out = f"{delta}\n\n[declaude] plain English:\n\n{plain}"
+    out = f"{delta}\n\n{LABEL} plain English:\n\n{plain}"
     print(
         json.dumps(
             {
@@ -270,21 +273,30 @@ def handle_stop(payload: dict, token: str) -> int:
     plain = _plain_rendition(text, token, timeout=120)
     if plain is None:
         return 0
-    print(
-        json.dumps({"systemMessage": f"[declaude] plain-English version:\n\n{plain}"})
-    )
+    print(json.dumps({"systemMessage": f"{LABEL} plain English:\n\n{plain}"}))
     return 0
 
 
 def main() -> int:
-    # Version 1.0 documented a manual hook registration. Marketplace updates
-    # must not activate this second, paid invocation until the user removes the
-    # old entry and explicitly opts in through /declaude:setup. Manual
-    # invocations do not carry --plugin and keep their existing behavior.
+    # The plugin rewrites replies by default, so a fresh install works at once.
+    # An explicit false turns the hook off.
+    #
+    # The second branch is a best-effort guard for version 1.0 users, whose
+    # manual hook would bill every reply twice. It fires only when Claude Code
+    # leaves CLAUDE_PLUGIN_OPTION_HOOK_ENABLED empty for an unset option. If
+    # Claude Code instead exports the declared default, this branch never runs,
+    # and /declaude:setup remains the only migration guard. Confirm which
+    # behavior Claude Code has before you rely on this branch.
+    #
+    # Manual invocations do not carry --plugin and keep their existing behavior.
     plugin_invocation = "--plugin" in sys.argv[1:]
     if plugin_invocation:
-        enabled = os.environ.get("CLAUDE_PLUGIN_OPTION_HOOK_ENABLED", "").lower()
-        if enabled not in {"1", "true", "yes", "on"}:
+        enabled = (
+            os.environ.get("CLAUDE_PLUGIN_OPTION_HOOK_ENABLED", "").strip().lower()
+        )
+        if enabled in {"0", "false", "no", "off"}:
+            return 0
+        if not enabled and os.environ.get("DECLAUDE_TOKEN"):
             return 0
         token = os.environ.get("CLAUDE_PLUGIN_OPTION_API_KEY") or os.environ.get(
             "DECLAUDE_TOKEN"
