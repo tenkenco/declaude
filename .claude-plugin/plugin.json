@@ -1,7 +1,7 @@
 {
   "name": "declaude",
   "description": "Rewrites Claude-English into plain English: sycophantic openers, hedging filler and padded phrasing out, facts, code blocks, names and numbers untouched. Runs an open-weights model on dedicated GPUs, so text never reaches a commercial AI provider.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": {
     "name": "Tenken",
     "url": "https://www.tenken.co"

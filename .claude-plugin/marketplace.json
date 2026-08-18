@@ -9,7 +9,7 @@
     {
       "name": "declaude",
       "source": "./",
-      "description": "Rewrites Claude-English into plain English. Adds a skill your agent can call on any draft, README or message.",
+      "description": "Rewrites Claude-English into plain English. Installs the Claude Code hook, so every reply gets a plain rendition inline.",
       "category": "productivity"
     }
   ]

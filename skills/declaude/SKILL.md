@@ -16,6 +16,18 @@ disk, a database, or logs.
 
 ## Setup
 
+The plugin is the shortest route. It installs this skill and registers the Claude Code hook
+in one step:
+
+```
+/plugin marketplace add tenkenco/declaude
+/plugin install declaude@tenken
+```
+
+Then run `/declaude:setup` to add the key the hook needs.
+
+For the MCP server on its own:
+
 ```bash
 claude mcp add --transport http declaude https://speak-english.tenken.co/mcp
 ```
@@ -66,16 +78,17 @@ Recommended install uses the `MessageDisplay` hook event: Claude Code streams ea
 the hook in chunks (`session_id`, `message_id`, `index`, `delta`, `final: true` on the last
 one), and the hook's `displayContent` reply is rendered in the terminal in place of the final
 chunk. The plain rendition appears inline directly under each reply, and nothing is written
-into the model's context. The event is present in current Claude Code but undocumented, so
-the hook fails open: on any error, or on versions without the event, the original text
-displays unchanged.
+into the model's context. The hook fails open, so any error leaves the original text on
+screen. Older Claude Code versions lack the event and display the original text too.
 
-Install steps, the settings.json snippets for both the `MessageDisplay` and fallback `Stop`
-registrations, and the timeout guidance live in
+The plugin registers this hook on install, through `hooks/hooks.json` at the plugin root.
+Only `DECLAUDE_TOKEN` remains, and `/declaude:setup` walks the user through it.
+
+Manual install steps, the settings.json snippets for both the `MessageDisplay` and fallback
+`Stop` registrations, and the timeout guidance live in
 [`hook/README.md`](https://github.com/tenkenco/declaude/blob/main/hook/README.md); that file
-is the single source for install instructions. Register only ONE of the two events, and
-remove any old `Stop` entry when adding `MessageDisplay`, or every reply is translated and
-billed twice.
+is the single source for install instructions. Register the hook ONCE. A plugin install plus
+a manual entry, or both events at once, translates and bills every reply twice.
 
 Alternative: the [claudish-to-english](https://github.com/gvzdv/claudish-to-english) plugin
 (which pioneered this hook) can point at declaude instead of local Ollama:

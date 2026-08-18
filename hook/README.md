@@ -3,14 +3,53 @@
 Claude Code hook client for the hosted declaude service. One script, two hook
 events; it dispatches on `hook_event_name`.
 
-## Install (MessageDisplay, recommended)
+The plugin installs this hook for you. Install it by hand only if you do not
+want the plugin.
+
+## Install (plugin, recommended)
+
+```
+/plugin marketplace add tenkenco/declaude
+/plugin install declaude@tenken
+```
+
+The plugin ships `hooks/hooks.json` at its root, and Claude Code loads that file
+on install. It registers the `MessageDisplay` event and points at
+`hook/declaude_hook.py` inside the plugin, with a 30 second timeout.
+
+Two steps remain:
+
+1. Get a `dk_` key at [/signin](https://speak-english.tenken.co/signin).
+2. `export DECLAUDE_TOKEN=<key>` in your shell profile, then start Claude Code
+   from a new terminal.
+
+The hook exits silently while `DECLAUDE_TOKEN` is unset, so the plugin is inert
+until you finish those steps. Run `/declaude:setup` to walk through them.
+
+If you already registered this hook by hand, remove that entry now. A manual
+entry plus the plugin translates every reply twice and bills you twice. Claude
+Code merges hooks from several settings files, so check them all:
+
+```bash
+for f in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/settings.json \
+         "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/settings.local.json \
+         .claude/settings.json .claude/settings.local.json; do
+  [ -f "$f" ] && grep -l declaude_hook "$f"
+done
+```
+
+Windows: the registered command calls `python3`, which Windows does not ship
+under that name. Skip the plugin registration there. Install by hand instead,
+with `python` or the `py` launcher in the command.
+
+## Install (manual, MessageDisplay)
 
 The `MessageDisplay` event streams each assistant reply to the hook in chunks
 and renders the hook's `displayContent` reply in the terminal. The plain-English
 rendition appears inline directly under each reply, at display time only:
-nothing enters the model's context window, so it costs zero Claude tokens. The
-event exists in current Claude Code but is undocumented; the hook fails open,
-so on errors or older versions the original text displays unchanged.
+nothing enters the model's context window, so it costs zero Claude tokens. Older
+Claude Code versions lack the event; the hook fails open, so on errors or older
+versions the original text displays unchanged.
 
 1. Get a `dk_` key at the declaude landing page ([/signin](https://speak-english.tenken.co/signin)).
 2. `export DECLAUDE_TOKEN=<key>` in your shell profile.
@@ -55,12 +94,20 @@ system message after the turn instead of inline:
 {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "python3 /path/to/declaude_hook.py"}]}]}}
 ```
 
-Register only ONE of the two events. With both registered on a current Claude
-Code, each reply is translated twice and billed twice. If you upgrade from the
-old Stop install, remove the `Stop` entry when you add `MessageDisplay`.
+Register the hook ONCE. The plugin install and the two manual installs are three
+routes to the same script, so pick one. With two of them live on a current
+Claude Code, each reply is translated twice and billed twice. If you upgrade
+from the old Stop install, remove the `Stop` entry when you add
+`MessageDisplay` or the plugin.
 
 Both modes fail open: if the service or your quota is unavailable, your
 session is never blocked.
+
+## Two similar directory names
+
+`hooks/` is the name the plugin specification requires. It holds `hooks.json`,
+the registration Claude Code reads on install. `hook/` predates it and holds the
+script and its tests. Keep the two apart.
 
 ## MCP alternative
 
