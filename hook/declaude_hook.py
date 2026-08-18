@@ -37,6 +37,7 @@ DEFAULT_URL = "https://speak-english.tenken.co"
 # One label for both modes, so the rendition is easy to spot in a busy terminal.
 LABEL = "🧼 declaude"
 MIN_CHARS = 40  # don't burn a translation on one-liners
+
 # Claude Code dispatches up to 3 chunk invocations concurrently and fires the
 # final one immediately, so the final invocation may have to wait for earlier
 # chunks that are still in flight.
@@ -44,6 +45,14 @@ CHUNK_WAIT_SECONDS = 3.0
 # Interrupted streams (Esc, crash, hook timeout) never deliver final=true, so
 # their chunk files would otherwise accumulate forever.
 STALE_AFTER_SECONDS = 3600
+
+
+class QuotaExhausted(str):
+    """The account hit its monthly limit. Carries the notice to display.
+
+    Quota exhaustion is the one failure worth showing. Every reply costs a
+    translation now, so a silent stop reads as a broken plugin.
+    """
 
 
 def translate(
@@ -184,9 +193,24 @@ def _cleanup_chunks(buffer_dir: str, key: str, final_index: int) -> None:
             pass
 
 
+def _quota_notice(error: urllib.error.HTTPError) -> str:
+    """Build the one-line notice shown when the account hits its monthly limit."""
+    upgrade = ""
+    try:
+        body = json.load(error)
+        if isinstance(body.get("upgrade_url"), str):
+            upgrade = " Upgrade: " + body["upgrade_url"]
+    except Exception:  # noqa: BLE001 - the notice must not depend on the body
+        pass
+    return (
+        "monthly translation limit reached, so this reply was not rewritten." + upgrade
+    )
+
+
 def _plain_rendition(text: str, token: str, timeout: int) -> str | None:
     """Shared gate for both modes: skip short messages, translate, and drop
-    renditions that add nothing. Any failure degrades gracefully to None."""
+    renditions that add nothing. Any failure degrades gracefully to None, except
+    an exhausted quota, which returns a QuotaExhausted notice to display."""
     if len(text) < MIN_CHARS:
         return None
     try:
@@ -198,11 +222,7 @@ def _plain_rendition(text: str, token: str, timeout: int) -> str | None:
         )
     except urllib.error.HTTPError as e:
         if e.code == 402:
-            print(
-                "declaude: free tier exhausted — upgrade via the payment link"
-                " in the 402 response",
-                file=sys.stderr,
-            )
+            return QuotaExhausted(_quota_notice(e))
         return None  # degrade gracefully: never break the user's session
     except Exception:  # noqa: BLE001 - fail open: no failure may break the session
         return None
@@ -251,7 +271,10 @@ def handle_message_display(payload: dict, token: str) -> int:
     plain = _plain_rendition(earlier + delta, token, timeout=25)
     if plain is None:
         return 0
-    out = f"{delta}\n\n{LABEL} plain English:\n\n{plain}"
+    if isinstance(plain, QuotaExhausted):
+        out = f"{delta}\n\n{LABEL} {plain}"
+    else:
+        out = f"{delta}\n\n{LABEL} plain English:\n\n{plain}"
     print(
         json.dumps(
             {
@@ -272,6 +295,9 @@ def handle_stop(payload: dict, token: str) -> int:
     # Stop is not on the display path, so it can afford to ride out a cold GPU.
     plain = _plain_rendition(text, token, timeout=120)
     if plain is None:
+        return 0
+    if isinstance(plain, QuotaExhausted):
+        print(json.dumps({"systemMessage": f"{LABEL} {plain}"}))
         return 0
     print(json.dumps({"systemMessage": f"{LABEL} plain English:\n\n{plain}"}))
     return 0

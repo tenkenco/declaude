@@ -13,9 +13,8 @@
     "api_key": {
       "type": "string",
       "title": "API key",
-      "description": "Paste a dk_ key from speak-english.tenken.co/signin. Create an account there first. The plugin cannot rewrite anything without this key.",
-      "sensitive": true,
-      "required": true
+      "description": "Paste a dk_ key from speak-english.tenken.co/signin. The hook needs this key to rewrite replies, and it stays silent without one. The MCP tools sign in separately and do not need it.",
+      "sensitive": true
     },
     "hook_enabled": {
       "type": "boolean",

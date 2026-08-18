@@ -6,6 +6,7 @@ import os
 import stat
 import sys
 import time
+import urllib.error
 
 import pytest
 
@@ -442,4 +443,71 @@ def test_stop_drops_identical_rewrite(tmp_path, capsys, monkeypatch):
 def test_empty_translation_is_dropped(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr(dh, "translate", lambda text, **k: "   ")
     assert dh.handle_stop(_stop_payload(tmp_path, "x" * 80), "tok") == 0
+    assert capsys.readouterr().out == ""
+
+
+def _http_402(body=b'{"upgrade_url": "https://example.test/upgrade"}'):
+    return urllib.error.HTTPError(
+        "https://speak-english.tenken.co/v1/translate",
+        402,
+        "Payment Required",
+        {},
+        io.BytesIO(body),
+    )
+
+
+def test_message_display_says_when_the_quota_ran_out(buffer_home, capsys, monkeypatch):
+    """Every reply costs a translation, so a silent stop reads as a broken plugin."""
+
+    def refuse(text, **kwargs):
+        raise _http_402()
+
+    monkeypatch.setattr(dh, "translate", refuse)
+    assert (
+        dh.handle_message_display(_md_payload("x" * 80, index=0, final=True), "tok")
+        == 0
+    )
+    dc = json.loads(capsys.readouterr().out)["hookSpecificOutput"]["displayContent"]
+    assert "monthly translation limit reached" in dc
+    assert "https://example.test/upgrade" in dc
+    assert "plain English:" not in dc, "a notice must not pose as a rewrite"
+
+
+def test_quota_notice_survives_a_body_it_cannot_read(buffer_home, capsys, monkeypatch):
+    def refuse(text, **kwargs):
+        raise _http_402(b"not json")
+
+    monkeypatch.setattr(dh, "translate", refuse)
+    assert (
+        dh.handle_message_display(_md_payload("x" * 80, index=0, final=True), "tok")
+        == 0
+    )
+    dc = json.loads(capsys.readouterr().out)["hookSpecificOutput"]["displayContent"]
+    assert "monthly translation limit reached" in dc
+    assert "Upgrade:" not in dc
+
+
+def test_stop_says_when_the_quota_ran_out(tmp_path, capsys, monkeypatch):
+    def refuse(text, **kwargs):
+        raise _http_402()
+
+    monkeypatch.setattr(dh, "translate", refuse)
+    assert dh.handle_stop(_stop_payload(tmp_path, "x" * 80), "tok") == 0
+    message = json.loads(capsys.readouterr().out)["systemMessage"]
+    assert message.startswith(dh.LABEL)
+    assert "monthly translation limit reached" in message
+    assert "plain English:" not in message
+
+
+def test_other_http_errors_stay_silent(buffer_home, capsys, monkeypatch):
+    """Only an exhausted quota is worth interrupting the reply for."""
+
+    def refuse(text, **kwargs):
+        raise urllib.error.HTTPError("u", 401, "Unauthorized", {}, io.BytesIO(b""))
+
+    monkeypatch.setattr(dh, "translate", refuse)
+    assert (
+        dh.handle_message_display(_md_payload("x" * 80, index=0, final=True), "tok")
+        == 0
+    )
     assert capsys.readouterr().out == ""

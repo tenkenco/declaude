@@ -119,14 +119,15 @@ def test_plugin_ships_the_setup_skill():
     assert (ROOT / "skills" / "setup" / "SKILL.md").is_file()
 
 
-def test_plugin_configuration_rewrites_by_default_and_demands_a_secure_key():
-    """A fresh install rewrites replies, and Claude Code refuses an empty key."""
+def test_plugin_configuration_rewrites_by_default_and_secures_the_key():
+    """A fresh install rewrites replies. The key stays optional, because the MCP
+    tools sign in on their own and must not demand one."""
     options = PLUGIN["userConfig"]
     assert options["hook_enabled"]["type"] == "boolean"
     assert options["hook_enabled"]["default"] is True
     assert options["api_key"]["type"] == "string"
     assert options["api_key"]["sensitive"] is True
-    assert options["api_key"]["required"] is True
+    assert "required" not in options["api_key"], "a required key blocks MCP-only users"
 
 
 def test_setup_requires_opt_in_without_replacing_an_existing_key():

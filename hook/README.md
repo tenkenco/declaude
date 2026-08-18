@@ -17,15 +17,19 @@ The plugin ships `hooks/hooks.json` at its root, and Claude Code loads that file
 on install. It registers the `MessageDisplay` event and points at
 `hook/declaude_hook.py` inside the plugin, with a 30 second timeout.
 
-The `api_key` option is required, so Claude Code asks for a key when you enable
-the plugin. The `hook_enabled` option defaults to true. So a fresh install
-rewrites replies as soon as you paste a key.
+The `hook_enabled` option defaults to true. So a fresh install rewrites replies
+as soon as you set an `api_key`. The key stays optional, because the MCP tools
+sign in on their own and must not demand one.
 
 New install:
 
 1. Get a `dk_` key at [/signin](https://speak-english.tenken.co/signin).
-2. Enable the plugin and paste the key in the masked `api_key` field.
+2. Run `/plugin configure declaude@tenken` and paste the key in the masked
+   `api_key` field.
 3. Run `/reload-plugins`, as the configuration dialog instructs.
+
+The hook prints nothing when it has no key. So run `/declaude:setup` if no
+rendition appears.
 
 Upgrade from version 1.0: run `/declaude:setup` instead. It removes any manual
 hook entry first, because a manual entry plus the plugin bills you twice.

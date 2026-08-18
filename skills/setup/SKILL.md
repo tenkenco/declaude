@@ -7,8 +7,8 @@ description: Finish declaude setup after installing the plugin. Use when the pla
 
 The plugin already registers the Claude Code hook. It ships `hooks/hooks.json`, which
 Claude Code loads on install. Its `hook_enabled` option defaults to true, so a fresh
-install rewrites replies at once. The `api_key` option is required, so Claude Code asks
-for a key when the user enables the plugin.
+install rewrites replies at once. The `api_key` option stays optional, because the MCP
+tools sign in on their own and must not demand a key.
 
 One case still stays inert. A user who exports `DECLAUDE_TOKEN` and never sets
 `hook_enabled` keeps the plugin hook off. That user may still run a version 1.0 manual
@@ -55,11 +55,10 @@ Only after every manual entry is removed, run:
 
 Set the options in the configuration dialog:
 
-- `api_key`: this field is required, so the dialog rejects an empty value. If a key is
-  already stored, do not edit or replace it. Otherwise get a `dk_` key at
-  [/signin](https://speak-english.tenken.co/signin) and enter it in this masked field. Do
-  not paste it into the chat. Existing `DECLAUDE_TOKEN` users must also supply a key here,
-  because the dialog cannot read that environment variable.
+- `api_key`: if a key is already stored, do not edit or replace it. Otherwise get a `dk_`
+  key at [/signin](https://speak-english.tenken.co/signin) and enter it in this masked
+  field. Do not paste it into the chat. Existing `DECLAUDE_TOKEN` users may leave this
+  empty, because the hook falls back to that environment variable.
 - `hook_enabled`: type `true` or `false` in this field. It is true by default. Type
   `false` to stop automatic rewrites. Type `true` if the user exports `DECLAUDE_TOKEN` and
   wants the plugin hook on. The hook exits silently when it has no key, so a missing key
