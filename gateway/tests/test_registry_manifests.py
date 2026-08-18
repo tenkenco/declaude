@@ -120,11 +120,11 @@ def test_plugin_ships_the_setup_skill():
 
 
 def test_plugin_configuration_rewrites_by_default_and_secures_the_key():
-    """A fresh install rewrites replies. The key stays optional, because the MCP
-    tools sign in on their own and must not demand one."""
+    """The hook treats an unset switch as enabled. Do not declare a manifest
+    default: exporting an implicit true would defeat the legacy-token guard."""
     options = PLUGIN["userConfig"]
     assert options["hook_enabled"]["type"] == "boolean"
-    assert options["hook_enabled"]["default"] is True
+    assert "default" not in options["hook_enabled"]
     assert options["api_key"]["type"] == "string"
     assert options["api_key"]["sensitive"] is True
     assert "required" not in options["api_key"], "a required key blocks MCP-only users"

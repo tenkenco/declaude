@@ -1,5 +1,6 @@
 """Tests for the client hook (run: python3 -m pytest hook/ or uv run --with pytest pytest)."""
 
+from concurrent.futures import ThreadPoolExecutor
 import io
 import json
 import os
@@ -296,8 +297,7 @@ def test_message_display_waits_for_in_flight_chunk(buffer_home, capsys, monkeypa
 
 
 def test_message_display_rejects_drifted_payload(buffer_home, capsys):
-    """The event is undocumented; a missing/renamed field must not collapse
-    every message onto one shared buffer key."""
+    """A missing or renamed field must not collapse messages onto one key."""
     for bad in (
         {"message_id": None},
         {"session_id": None},
@@ -569,6 +569,39 @@ def test_quota_hold_expires_so_an_upgrade_takes_effect(
     dc = json.loads(capsys.readouterr().out)["hookSpecificOutput"]["displayContent"]
     assert "plain version" in dc
     assert not marker.exists(), "the stale marker must be swept"
+
+
+def test_stop_quota_hold_expires_so_an_upgrade_takes_effect(
+    tmp_path, buffer_home, capsys, monkeypatch
+):
+    def refuse(text, **kwargs):
+        raise _http_402()
+
+    payload = _stop_payload(tmp_path, "x" * 80)
+    monkeypatch.setattr(dh, "translate", refuse)
+    assert dh.handle_stop(payload, "tok") == 0
+    capsys.readouterr()
+
+    marker = buffer_home / dh.QUOTA_MARKER
+    stale = time.time() - dh.STALE_AFTER_SECONDS - 60
+    os.utime(marker, (stale, stale))
+
+    calls = []
+    monkeypatch.setattr(
+        dh, "translate", lambda text, **k: calls.append(text) or "plain version"
+    )
+    assert dh.handle_stop(payload, "tok") == 0
+    assert calls == ["x" * 80]
+    assert "plain version" in capsys.readouterr().out
+    assert not marker.exists()
+
+
+def test_concurrent_quota_notices_have_one_winner(buffer_home):
+    buffer_dir = dh._buffer_dir()
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(lambda _: dh._note_quota(buffer_dir), range(8)))
+    assert results.count(True) == 1
+    assert results.count(False) == 7
 
 
 def test_stop_quota_notice_shows_once(tmp_path, buffer_home, capsys, monkeypatch):

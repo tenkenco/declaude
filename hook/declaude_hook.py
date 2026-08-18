@@ -15,7 +15,7 @@ ONE of the two events).
 
 Env:
   CLAUDE_PLUGIN_OPTION_API_KEY - secure plugin-config key (plugin install)
-  CLAUDE_PLUGIN_OPTION_HOOK_ENABLED - plugin opt-in (default: false)
+  CLAUDE_PLUGIN_OPTION_HOOK_ENABLED - plugin switch (unset means enabled)
   DECLAUDE_TOKEN - dk_ API key or session token (manual install / migration)
   DECLAUDE_URL   - service base URL (default: production)
 """
@@ -155,22 +155,43 @@ def _sweep_stale(buffer_dir: str) -> None:
 
 
 def _quota_held(buffer_dir: str | None) -> bool:
-    """True while a recent 402 is on record. _sweep_stale expires the marker, so
-    an upgrade takes effect within the hour without restarting the session."""
+    """True while a recent 402 is on record.
+
+    Check age here instead of relying on the chunk sweeper. Stop hooks never
+    collect chunks, but their quota hold still has to expire.
+    """
     if buffer_dir is None:
         return False
-    return os.path.exists(os.path.join(buffer_dir, QUOTA_MARKER))
-
-
-def _note_quota(buffer_dir: str | None) -> None:
-    """Record the 402 so the notice shows once, not on every reply after it."""
-    if buffer_dir is None:
-        return
+    marker = os.path.join(buffer_dir, QUOTA_MARKER)
     try:
-        with open(os.path.join(buffer_dir, QUOTA_MARKER), "w") as f:
-            f.write("")
+        if os.lstat(marker).st_mtime >= time.time() - STALE_AFTER_SECONDS:
+            return True
+        os.unlink(marker)
     except OSError:
-        return
+        pass
+    return False
+
+
+def _note_quota(buffer_dir: str | None) -> bool:
+    """Claim the right to show the quota notice.
+
+    Hook processes run concurrently across Claude sessions. O_EXCL makes one
+    process the winner when several requests discover the exhausted quota at
+    the same time.
+    """
+    if buffer_dir is None:
+        return True
+    try:
+        fd = os.open(
+            os.path.join(buffer_dir, QUOTA_MARKER),
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            0o600,
+        )
+        with os.fdopen(fd, "w") as f:
+            f.write("")
+        return True
+    except OSError:
+        return False
 
 
 def _chunk_path(buffer_dir: str, key: str, index: int) -> str:
@@ -256,9 +277,9 @@ def handle_message_display(payload: dict, token: str) -> int:
     """Buffer chunks; on the final one, attach the plain rendition via
     displayContent. Emitting nothing leaves the original displayed (fail open).
 
-    MessageDisplay is undocumented and its payload shape may drift between
-    Claude Code versions, so anything unexpected means do nothing rather than
-    guess."""
+    Validate the documented payload because older Claude Code versions and
+    future schema changes must fail open rather than collapse messages onto a
+    shared buffer key."""
     delta = payload.get("delta")
     if delta is None:
         delta = ""
@@ -295,7 +316,8 @@ def handle_message_display(payload: dict, token: str) -> int:
     if plain is None:
         return 0
     if isinstance(plain, QuotaExhausted):
-        _note_quota(buffer_dir)
+        if not _note_quota(buffer_dir):
+            return 0
         out = f"{delta}\n\n{LABEL} {plain}"
     else:
         out = f"{delta}\n\n{LABEL} plain English:\n\n{plain}"
@@ -324,7 +346,8 @@ def handle_stop(payload: dict, token: str) -> int:
     if plain is None:
         return 0
     if isinstance(plain, QuotaExhausted):
-        _note_quota(buffer_dir)
+        if not _note_quota(buffer_dir):
+            return 0
         print(json.dumps({"systemMessage": f"{LABEL} {plain}"}))
         return 0
     print(json.dumps({"systemMessage": f"{LABEL} plain English:\n\n{plain}"}))
@@ -335,12 +358,10 @@ def main() -> int:
     # The plugin rewrites replies by default, so a fresh install works at once.
     # An explicit false turns the hook off.
     #
-    # Claude Code omits an unset option from the hook environment. It does not
-    # export the declared default. Measured on 2026-08-18: with the default
-    # declared true and no stored value, the variable arrived absent. So the
-    # declared default alone can never turn this hook on, and the empty case
-    # has to mean on. Do not restore the old "explicit true only" gate, because
-    # that combination ships the feature dead.
+    # The manifest deliberately declares no default. An unset option therefore
+    # arrives absent and means on here. Keeping the default out of the manifest
+    # also makes the legacy guard below safe if Claude Code starts exporting
+    # declared defaults to match its documented userConfig contract.
     #
     # The second branch protects version 1.0 users. Their manual hook plus this
     # one would bill every reply twice. An unset option does arrive empty, so

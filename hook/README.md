@@ -17,9 +17,11 @@ The plugin ships `hooks/hooks.json` at its root, and Claude Code loads that file
 on install. It registers the `MessageDisplay` event and points at
 `hook/declaude_hook.py` inside the plugin, with a 30 second timeout.
 
-The `hook_enabled` option defaults to true. So a fresh install rewrites replies
-as soon as you set an `api_key`. The key stays optional, because the MCP tools
-sign in on their own and must not demand one.
+An unset `hook_enabled` option means on. So a fresh install rewrites replies as
+soon as you set an `api_key`. The manifest declares no default because Claude
+Code's documented behavior is to export declared defaults to plugin processes.
+Keeping the default in the hook preserves the version 1.0 migration guard. The
+key stays optional because the MCP tools sign in on their own and do not need it.
 
 New install:
 
@@ -41,11 +43,10 @@ The hook carries one more guard for version 1.0 users. It stays inert when you
 export `DECLAUDE_TOKEN` and Claude Code passes no value for `hook_enabled`. So
 run `/declaude:setup` when you upgrade, and remove the manual hook yourself.
 
-Claude Code omits an unset option from the hook environment. It does not export
-the declared default. Measured on 2026-08-18: with the default declared true and
-no stored value, the variable arrived absent. So the guard fires, and the
-declared default alone can never turn the hook on. The hook treats an empty
-value as on for that reason.
+Claude Code 2.1.234 omitted an unset option from the hook environment in a local
+probe on 2026-08-18. The manifest deliberately declares no default, so an unset
+option remains distinct from an explicit `true` even if Claude Code changes how
+it exports declared defaults. The hook treats the empty value as on.
 
 The hook stays quiet about most failures, so a bad network never breaks a
 session. It speaks up for one case. An exhausted monthly quota shows a notice
@@ -80,9 +81,9 @@ with `python` or the `py` launcher in the command.
 The `MessageDisplay` event streams each assistant reply to the hook in chunks
 and renders the hook's `displayContent` reply in the terminal. The plain-English
 rendition appears inline directly under each reply, at display time only:
-nothing enters the model's context window, so it costs zero Claude tokens. Older
-Claude Code versions lack the event; the hook fails open, so on errors or older
-versions the original text displays unchanged.
+nothing enters the model's context window, so it costs zero Claude tokens. The
+event is part of the current Claude Code hooks reference. Older Claude Code
+versions lack it; the hook fails open, so the original text displays unchanged.
 
 1. Get a `dk_` key at the declaude landing page ([/signin](https://speak-english.tenken.co/signin)).
 2. `export DECLAUDE_TOKEN=<key>` in your shell profile.

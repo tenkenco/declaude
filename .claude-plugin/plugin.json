@@ -19,8 +19,7 @@
     "hook_enabled": {
       "type": "boolean",
       "title": "Enable automatic rewrites",
-      "description": "Enter true or false. It is true by default. Set it to false to stop automatic rewrites. Each rewrite counts against your quota. Set it to false if you still run a manual declaude hook, because two hooks bill you twice.",
-      "default": true
+      "description": "Enter true or false. An unset value enables automatic rewrites. Set it to false to stop them. Each rewrite counts against your quota. Set it to false if you still run a manual declaude hook, because two hooks bill you twice."
     }
   },
   "keywords": [
