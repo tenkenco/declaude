@@ -37,7 +37,11 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - name: Lint
         # --isolated: the hook ships no project config, so pin the rules to ruff's own.
-        run: uv run --no-project --with ruff ruff check --isolated .
+        # known-first-party: without it, ruff guesses where declaude_hook belongs, and the
+        # guess differs between machines. Naming it keeps the import order stable.
+        run: >
+          uv run --no-project --with ruff ruff check --isolated
+          --config "lint.isort.known-first-party=['declaude_hook']" .
       - name: Test hook client
         run: uv run --no-project --with pytest pytest -q .
 

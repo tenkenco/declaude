@@ -7,8 +7,9 @@ import stat
 import sys
 import time
 
-import declaude_hook as dh
 import pytest
+
+import declaude_hook as dh
 
 POSIX = hasattr(os, "getuid")
 
