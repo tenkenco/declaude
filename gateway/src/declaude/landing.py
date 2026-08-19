@@ -105,9 +105,9 @@ footer a{color:var(--muted)}
 
   <div class="demo" id="try">
     <div class="before"><p class="label">Before</p>
-      <textarea id="demo-in" rows="3" maxlength="1200" placeholder="Great question! Before I answer, let me make sure I understand what you&#x27;re asking. You want to know why the build is failing. Let me walk through my thinking, and then I&#x27;ll give you the answer."></textarea></div>
+      <textarea id="demo-in" rows="3" maxlength="1200" placeholder="One thing I didn&#x27;t touch, but you won&#x27;t want to leave hanging, is the migration script. I&#x27;d be happy to walk you through it whenever you&#x27;re ready!"></textarea></div>
     <div class="after"><p class="label">After</p>
-      <p id="demo-out">I understand you want to know why the build is failing. Here&#x27;s what I think is happening.</p></div>
+      <p id="demo-out">One thing I didn&#x27;t cover is the migration script. When you&#x27;re ready, I can go through it with you.</p></div>
     <div class="demo-bar">
       <button id="demo-go">Translate</button>
       <span id="demo-note" class="hint">No sign-in needed. Type, paste, or drop a file.</span>
