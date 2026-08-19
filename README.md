@@ -29,6 +29,13 @@ Before  "Great question! Before I answer, let me make sure I understand what
 
 After   "I understand you want to know why the build is failing. Here's what
         I think is happening."
+
+Before  "One thing I didn't touch, but you won't want to leave hanging, is the
+        migration script. I'd be happy to walk you through it whenever you're
+        ready!"
+
+After   "One thing I didn't cover is the migration script. When you're ready,
+        I can go through it with you."
 ```
 
 Runs on an open-source model (Qwen2.5-14B-AWQ) on our own L4 GPUs, so your text never
@@ -54,9 +61,10 @@ In Claude Code, install the plugin. It brings the skill and registers the hook:
 /plugin install declaude@tenken
 ```
 
-Then run `/declaude:setup`. It safely migrates any manual hook, configures a `dk_` key, and
-opts into the plugin hook. Claude Code stores the key in secure plugin configuration. The
-registered hook stays inert until setup enables it.
+Then run `/declaude:setup`. It safely migrates any manual hook and configures a `dk_` key.
+Claude Code stores the key in secure plugin configuration. The hook rewrites replies as soon
+as a key exists. Set the `hook_enabled` option to false to stop it. The hook stays silent
+without a key, and it never blocks a session.
 
 For the MCP server on its own, in Claude Code or any other MCP client:
 
