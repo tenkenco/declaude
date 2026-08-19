@@ -124,8 +124,9 @@ footer a{color:var(--muted)}
   <h2>Three ways to use it</h2>
   <div class="ways">
     <div>
-      <h3><span class="n">1</span>Claude Code hook</h3>
-      <p>Rewrites replies as they render. Your transcript and token bill stay untouched.</p>
+      <h3><span class="n">1</span>Claude Code plugin</h3>
+      <p>Two commands install the hook. Replies render in plain English, and your transcript
+      and token bill stay untouched.</p>
     </div>
     <div>
       <h3><span class="n">2</span>MCP server</h3>
@@ -136,6 +137,10 @@ footer a{color:var(--muted)}
       <p>Drop a Markdown file, get it back rewritten.</p>
     </div>
   </div>
+
+  <pre><code>/plugin marketplace add tenkenco/declaude
+/plugin install declaude@tenken
+/declaude:setup</code></pre>
 
   <pre><code>claude mcp add --transport http declaude \\
   https://speak-english.tenken.co/mcp</code></pre>

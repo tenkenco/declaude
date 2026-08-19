@@ -50,3 +50,10 @@ def test_demo_hint_states_a_real_number(client):
     html = client.get("/").text
     assert "No sign-in needed" in html
     assert "a few tries" not in html
+
+
+def test_root_shows_the_plugin_install_path(client):
+    """The plugin is the headline install path; the page must carry the exact commands."""
+    html = client.get("/").text
+    assert "/plugin marketplace add tenkenco/declaude" in html
+    assert "/plugin install declaude@tenken" in html
