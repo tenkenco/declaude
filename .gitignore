@@ -11,4 +11,7 @@ __pycache__/
 *.tfstate
 *.tfstate.*
 terraform.tfvars
+# Local operational scripts. A leading dot marks a one-off that applies to
+# production from a workstation, so it stays out of the repository.
+infra/.*.sh
 .DS_Store

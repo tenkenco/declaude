@@ -1,0 +1,188 @@
+name: Terraform plan
+
+# Every pull request that touches infra gets a plan, and the plan names each resource that
+# Terraform would destroy or replace. A destructive plan fails this check until a human adds
+# the infra:destroy-ok label.
+#
+# The workflow runs on every pull request, not only on the ones that touch infra. A path
+# filter would leave the check pending forever on every other pull request, which stops you
+# from making it a required check. The detect job decides instead, and the plan job skips
+# when nothing under infra changed. GitHub counts a skipped job as a pass.
+
+on:
+  pull_request:
+    # labeled and unlabeled are here on purpose: adding infra:destroy-ok must re-run the gate.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+concurrency:
+  group: terraform-plan-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      infra: ${{ steps.check.outputs.infra }}
+    steps:
+      - name: Did this pull request touch infra?
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename')
+          if printf '%s\n' "$files" | grep -qE '^(infra/|\.github/workflows/terraform-plan\.yml$)'; then
+            echo "infra=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "infra=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  plan:
+    needs: detect
+    # A pull request from a fork gets no OIDC token, so skip it rather than fail on auth.
+    if: needs.detect.outputs.infra == 'true' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check the alert address is configured
+        env:
+          TF_VAR_alert_email: ${{ secrets.TF_ALERT_EMAIL }}
+        run: |
+          test -n "$TF_VAR_alert_email" || {
+            echo "Set the TF_ALERT_EMAIL repository secret. infra/README.md explains why."
+            exit 1
+          }
+
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/477468296053/locations/global/workloadIdentityPools/github/providers/github-oidc
+          # Read-only identity, and only a pull request job may use it.
+          service_account: github-planner@declaude-prod.iam.gserviceaccount.com
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_wrapper: false
+
+      - name: Init
+        run: terraform init -input=false
+
+      - name: Plan
+        env:
+          TF_VAR_alert_email: ${{ secrets.TF_ALERT_EMAIL }}
+        # -lock=false: the planner cannot write to the state bucket, and a pull request must
+        # never block a local apply.
+        #
+        # The readable plan goes to a file that nothing uploads. This repository is public,
+        # so its run logs are public too, and a plan prints refreshed state values. Errors
+        # still reach the log on stderr.
+        run: terraform plan -input=false -lock=false -no-color -out=tfplan > plan.txt
+
+      - name: Classify the changes
+        id: classify
+        run: |
+          set -euo pipefail
+          terraform show -json tfplan > plan.json
+
+          count() { jq "[.resource_changes[] | select($1)] | length" plan.json; }
+          is_replace='(.change.actions | index("delete")) and (.change.actions | index("create"))'
+          create=$(count '.change.actions == ["create"]')
+          update=$(count '.change.actions == ["update"]')
+          destroy=$(count '.change.actions == ["delete"]')
+          replace=$(count "$is_replace")
+          risky=$((destroy + replace))
+
+          # Addresses and actions only, in both the comment and the log.
+          jq -r '.resource_changes[]
+                 | select(.change.actions | index("delete"))
+                 | "- `" + (if (.change.actions | index("create")) then "replace" else "destroy" end)
+                   + "` " + .address' plan.json > risky.md
+
+          {
+            echo "create=$create"
+            echo "update=$update"
+            echo "destroy=$destroy"
+            echo "replace=$replace"
+            echo "risky=$risky"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Write the comment body
+        env:
+          CREATE: ${{ steps.classify.outputs.create }}
+          UPDATE: ${{ steps.classify.outputs.update }}
+          DESTROY: ${{ steps.classify.outputs.destroy }}
+          REPLACE: ${{ steps.classify.outputs.replace }}
+          RISKY: ${{ steps.classify.outputs.risky }}
+        run: |
+          set -euo pipefail
+          {
+            echo "<!-- terraform-plan -->"
+            echo "## Terraform plan"
+            echo
+            echo "| create | update | replace | destroy |"
+            echo "|---|---|---|---|"
+            echo "| $CREATE | $UPDATE | $REPLACE | $DESTROY |"
+            echo
+            if [ "$RISKY" -gt 0 ]; then
+              echo "### Destructive operations"
+              echo
+              cat risky.md
+              echo
+              echo "Terraform deletes each resource above. A replace deletes it, then builds a"
+              echo "new one, so the resource goes away for a while. Add the \`infra:destroy-ok\`"
+              echo "label once you accept that."
+            else
+              echo "No resource is destroyed or replaced."
+            fi
+            echo
+            echo "Run \`terraform plan\` locally to read the attribute diff. This workflow keeps"
+            echo "it out of the log, because the log is public."
+          } > body.md
+          cat body.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment on the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          jq -n --rawfile body body.md '{body: $body}' > payload.json
+          id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+                 --jq 'map(select(.body | startswith("<!-- terraform-plan -->"))) | first | .id // empty')
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$id" --input payload.json >/dev/null
+          else
+            gh api -X POST "repos/$REPO/issues/$PR/comments" --input payload.json >/dev/null
+          fi
+
+      - name: Gate destructive changes
+        env:
+          RISKY: ${{ steps.classify.outputs.risky }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          set -euo pipefail
+          if [ "$RISKY" -eq 0 ]; then
+            echo "No destructive operation. Nothing to approve."
+            exit 0
+          fi
+          case ",$LABELS," in
+            *,infra:destroy-ok,*)
+              echo "The infra:destroy-ok label accepts the destroy."
+              ;;
+            *)
+              echo "This plan destroys or replaces $RISKY resource(s). See the comment above."
+              echo "Add the infra:destroy-ok label to accept it."
+              exit 1
+              ;;
+          esac

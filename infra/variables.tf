@@ -92,3 +92,9 @@ variable "alert_email" {
     error_message = "alert_email must be a real address: export TF_VAR_alert_email=ops@example.com"
   }
 }
+
+variable "tfstate_bucket" {
+  description = "Bucket holding the Terraform state. The backend block cannot read a variable, so versions.tf repeats this name."
+  type        = string
+  default     = "declaude-prod-tfstate"
+}

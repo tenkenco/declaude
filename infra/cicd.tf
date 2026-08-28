@@ -24,10 +24,19 @@ resource "google_iam_workload_identity_pool_provider" "github" {
   }
 }
 
+# Scoped by subject, not by repository. A repository-wide principalSet let any workflow in the
+# repository impersonate this account, including one added by a pull request. GitHub sets the
+# subject from the job: "environment:production" when the job names an environment, and
+# "ref:refs/heads/main" when it does not. Both forms are allowed, so the deploy keeps working
+# whichever one GitHub sends. A pull request job carries "pull_request" and matches neither.
 resource "google_service_account_iam_member" "deployer_wif" {
+  for_each = toset([
+    "repo:${var.github_repo}:environment:production",
+    "repo:${var.github_repo}:ref:refs/heads/main",
+  ])
   service_account_id = google_service_account.deployer.name
   role               = "roles/iam.workloadIdentityUser"
-  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.repository/${var.github_repo}"
+  member             = "principal://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/subject/${each.key}"
 }
 
 resource "google_project_iam_member" "deployer_roles" {
@@ -39,4 +48,41 @@ resource "google_project_iam_member" "deployer_roles" {
   project = var.project_id
   role    = each.key
   member  = "serviceAccount:${google_service_account.deployer.email}"
+}
+
+# --- Pull request plans ---------------------------------------------------
+# A second identity, read-only. The Terraform plan on every infra pull request runs as this
+# service account. It reads the project to refresh state, and it reads the state bucket. It
+# holds no write permission anywhere, so plans must run with -lock=false. Pull request jobs
+# reach this account and no other, because every binding below is scoped by subject.
+
+resource "google_service_account" "planner" {
+  account_id   = "github-planner"
+  display_name = "GitHub Actions Terraform planner (read-only)"
+}
+
+# Pull request jobs only. A push to main carries a different subject and cannot use this
+# account, so the plan identity exists on pull requests and nowhere else.
+resource "google_service_account_iam_member" "planner_wif" {
+  service_account_id = google_service_account.planner.name
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "principal://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/subject/repo:${var.github_repo}:pull_request"
+}
+
+# viewer reads the resources. securityReviewer reads the IAM policies, which viewer does not
+# cover, and this configuration manages four kinds of IAM member. Both are read-only.
+resource "google_project_iam_member" "planner_roles" {
+  for_each = toset(["roles/viewer", "roles/iam.securityReviewer"])
+  project  = var.project_id
+  role     = each.key
+  member   = "serviceAccount:${google_service_account.planner.email}"
+}
+
+# objectViewer reads the state file. legacyBucketReader reads the bucket metadata that the
+# GCS backend asks for at init. Both are read-only.
+resource "google_storage_bucket_iam_member" "planner_state" {
+  for_each = toset(["roles/storage.objectViewer", "roles/storage.legacyBucketReader"])
+  bucket   = var.tfstate_bucket
+  role     = each.key
+  member   = "serviceAccount:${google_service_account.planner.email}"
 }
