@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "declaude": {
+      "type": "http",
+      "url": "https://speak-english.tenken.co/mcp",
+      "note": "declaude MCP server. Uses OAuth 2.1 with PKCE, so the client opens a browser sign-in on first connection. Tools: translate, usage."
+    }
+  }
+}
