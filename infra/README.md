@@ -82,7 +82,12 @@ each IAM policy to refresh them.
 Both accounts are bound by subject, not by repository:
 
 - `github-planner` accepts `repo:tenkenco/declaude:pull_request` only.
-- `github-deployer` accepts the main branch and the production environment only.
+- `github-deployer` accepts the production environment only.
+
+The `production` environment allows the `main` branch and no other, through a deployment
+branch policy in the repository settings. GitHub therefore refuses a `workflow_dispatch`
+run from any other branch before it issues a token. The deploy job must keep its
+`environment: production` line, because that line decides the subject.
 
 The binding used to cover the whole repository. Any workflow could then ask for any account,
 so a pull request that added one line could have deployed to production. Subjects close that.

@@ -25,18 +25,19 @@ resource "google_iam_workload_identity_pool_provider" "github" {
 }
 
 # Scoped by subject, not by repository. A repository-wide principalSet let any workflow in the
-# repository impersonate this account, including one added by a pull request. GitHub sets the
-# subject from the job: "environment:production" when the job names an environment, and
-# "ref:refs/heads/main" when it does not. Both forms are allowed, so the deploy keeps working
-# whichever one GitHub sends. A pull request job carries "pull_request" and matches neither.
+# repository impersonate this account, including one added by a pull request.
+#
+# The deploy job names the production environment, so GitHub sets the subject to
+# "environment:production". That one subject is the whole allowance. A pull request job
+# carries "pull_request", and a job on main without an environment carries
+# "ref:refs/heads/main". Neither one matches.
+#
+# The deploy job in .github/workflows/deploy.yml must keep its "environment: production"
+# line. Remove that line and GitHub sends a different subject, and the deploy loses access.
 resource "google_service_account_iam_member" "deployer_wif" {
-  for_each = toset([
-    "repo:${var.github_repo}:environment:production",
-    "repo:${var.github_repo}:ref:refs/heads/main",
-  ])
   service_account_id = google_service_account.deployer.name
   role               = "roles/iam.workloadIdentityUser"
-  member             = "principal://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/subject/${each.key}"
+  member             = "principal://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/subject/repo:${var.github_repo}:environment:production"
 }
 
 resource "google_project_iam_member" "deployer_roles" {
