@@ -66,11 +66,17 @@ Claude Code stores the key in secure plugin configuration. The hook rewrites rep
 as a key exists. Set the `hook_enabled` option to false to stop it. The hook stays silent
 without a key, and it never blocks a session.
 
-For the MCP server on its own, in Claude Code or any other MCP client:
+The plugin also registers the MCP server. The `translate` and `usage` tools then load in
+every directory.
+
+For the MCP server without the plugin, in Claude Code or any other MCP client:
 
 ```bash
-claude mcp add --transport http declaude https://speak-english.tenken.co/mcp
+claude mcp add --scope user --transport http declaude https://speak-english.tenken.co/mcp
 ```
+
+Keep `--scope user`. Claude Code otherwise defaults to `local` scope. Local scope binds the
+server to one directory, so the tools disappear in every other directory.
 
 No API key to paste: your client discovers OAuth, opens a browser sign-in, and holds the
 token. That is the whole setup.
